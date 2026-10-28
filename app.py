@@ -211,22 +211,36 @@ def submit():
     model_score = detector.model_signal(text)
     style_score = stylometry.style_signal(text)
     combined_score = scoring.combine_signals(model_score, style_score)
+    guess, label = scoring.score_to_label(combined_score)
+
+    # How far into this label's territory the score falls, not the raw score
+    # itself — 1.0 means as deep into "ai"/"human" as the scale allows, or (for
+    # "unsure") dead center of the unsure band. 0.0 means right at the edge.
+    if guess == "ai":
+        confidence = (combined_score - config.AI_THRESHOLD) / (1.0 - config.AI_THRESHOLD)
+    elif guess == "human":
+        confidence = (config.HUMAN_THRESHOLD - combined_score) / config.HUMAN_THRESHOLD
+    else:
+        band_half_width = (config.AI_THRESHOLD - config.HUMAN_THRESHOLD) / 2.0
+        band_midpoint = (config.AI_THRESHOLD + config.HUMAN_THRESHOLD) / 2.0
+        confidence = 1.0 - abs(combined_score - band_midpoint) / band_half_width
+    confidence = round(min(max(confidence, 0.0), 1.0), 4)
 
     audit.log_decision(
         content_id=content_id,
         creator_id=creator_id,
-        guess=None,
+        guess=guess,
         model_score=model_score,
         style_score=style_score,
         combined_score=combined_score,
-        label=None,
+        label=label,
     )
 
     return jsonify({
         "content_id": content_id,
-        "guess": "placeholder",
-        "confidence": 0.0,
-        "label": "PLACEHOLDER — not scored yet.",
+        "guess": guess,
+        "confidence": confidence,
+        "label": label,
         "model_score": model_score,
         "style_score": style_score,
     })
@@ -253,13 +267,36 @@ def appeal():
     wrong accusation and nothing at all.
     """
     payload = request.get_json(silent=True) or {}
+    content_id = payload.get("content_id")
+    reasoning = payload.get("reasoning")
 
-    # TODO: delete this and build the route.
+    if not isinstance(content_id, str) or not content_id.strip():
+        return jsonify({
+            "error": "invalid_request",
+            "message": "content_id is required.",
+        }), 400
+
+    if not isinstance(reasoning, str) or not reasoning.strip():
+        return jsonify({
+            "error": "invalid_request",
+            "message": "reasoning is required.",
+        }), 400
+
+    existing = audit.entries_for(content_id)
+    if not existing:
+        return jsonify({
+            "error": "not_found",
+            "message": f"No submission found with content_id '{content_id}'.",
+        }), 404
+
+    creator_id = existing[0].get("creator_id")
+    audit.log_appeal(content_id=content_id, creator_id=creator_id, reasoning=reasoning)
+
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /appeal isn't built yet — see the TODO in app.py.",
-        "you_sent": payload,
-    }), 501
+        "content_id": content_id,
+        "status": "under_review",
+        "message": "Your appeal has been recorded and will be reviewed.",
+    })
 
 
 # ── Already works ─────────────────────────────────────────────────────────────

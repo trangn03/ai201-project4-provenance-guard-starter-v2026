@@ -147,16 +147,31 @@ of being wrong favors trusting that read.
      Write them for someone who has never heard the word "threshold". -->
 
 | Label                 | Score range | The exact text a reader sees |
-| --------------------- | ----------- | ---------------------------- |
-| high-confidence human |             |                              |
-| unsure                |             |                              |
-| high-confidence AI    |             |                              |
+| --------------------- | ----------- | ----------------------------- |
+| high-confidence human | 0.00 – 0.35 | "We think this was probably written by a person." |
+| unsure                | 0.35 – 0.65 | "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation." |
+| high-confidence AI    | 0.65 – 1.00 | "We think this was probably written by AI, or with heavy AI assistance." |
 
 **Why I worded the "unsure" one this way:**
 
 <!-- It's the hardest of the three. It has to admit uncertainty without
      sounding like an accusation, because the person reading it may well have
      written every word themselves. -->
+
+It names what the system knows (it couldn't tell) instead of what it
+suspects (maybe AI). "Treat this result as inconclusive, not as an
+accusation" is there on purpose — the plain reading of "unsure" on your own
+writing is still "they think I might have used AI," so the sentence has to
+say out loud that this isn't a verdict, or a reader has no way to know that
+for themselves.
+
+**Confirming all three are reachable:** submitted through the running
+service — a plain personal anecdote with contractions and a parenthetical
+scored 0.2857 → `human`; a generic, hedging paragraph scored 0.7752 →
+`ai`; several genuinely human texts that were less extreme (a single clean
+sentence, dense formal prose, casual writing without much punctuation
+variety) landed between 0.37 and 0.60 → `unsure`. All three bands fire on
+real input, not just on constructed edge cases.
 
 ---
 
@@ -180,55 +195,63 @@ $ curl -X POST http://127.0.0.1:5000/submit \
 
 ```json
 {
-  "confidence": 0.0,
-  "content_id": "5a5941ef-468e-49f9-8e99-523940440c3a",
-  "guess": "placeholder",
-  "label": "PLACEHOLDER — not scored yet.",
+  "confidence": 0.1747,
+  "content_id": "c1891801-c3aa-4384-ba0c-f5c3cfcbc8c6",
+  "guess": "unsure",
+  "label": "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation.",
   "model_score": 0.5675,
   "style_score": 0.68
 }
 ```
-
-<!-- Milestone 4 checkpoint: both signals and combine_signals are wired in.
-     guess, confidence, and label are still placeholders — those fill in at
-     Milestone 5, once score_to_label is built. -->
 
 **An appeal**
 
 ```bash
 $ curl -X POST http://127.0.0.1:5000/appeal \
   -H "Content-Type: application/json" \
-  -d '{"content_id": "...", "reasoning": "..."}'
-```
-
-```json
-```
-
-**What the log shows afterwards**
-
-<!-- The appeal isn't built yet (Milestone 5) — this shows the submission's
-     log entry only. content_id matches the response above, and guess/label/
-     combined_score/style_score are present as null rather than missing,
-     which is what audit.py's nine-field-from-the-start design means. -->
-
-```bash
-$ curl "http://127.0.0.1:5000/log?limit=1"
+  -d '{"content_id": "c1891801-c3aa-4384-ba0c-f5c3cfcbc8c6", "reasoning": "I wrote this myself about my own grandmother. It is not AI-generated."}'
 ```
 
 ```json
 {
-  "count": 1,
+  "content_id": "c1891801-c3aa-4384-ba0c-f5c3cfcbc8c6",
+  "message": "Your appeal has been recorded and will be reviewed.",
+  "status": "under_review"
+}
+```
+
+**What the log shows afterwards**
+
+<!-- The original decision is untouched; the appeal sits after it as its own
+     entry, same content_id, status moved to under_review — audit.log_appeal
+     never overwrites the original. -->
+
+```bash
+$ curl "http://127.0.0.1:5000/log?limit=2"
+```
+
+```json
+{
+  "count": 2,
   "entries": [
     {
       "combined_score": 0.6238,
-      "content_id": "5a5941ef-468e-49f9-8e99-523940440c3a",
+      "content_id": "c1891801-c3aa-4384-ba0c-f5c3cfcbc8c6",
       "creator_id": "writer-1",
-      "guess": null,
-      "label": null,
+      "guess": "unsure",
+      "label": "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation.",
       "model_score": 0.5675,
       "status": "decided",
       "style_score": 0.68,
-      "timestamp": "2026-10-28T01:49:32+00:00"
+      "timestamp": "2026-10-28T02:00:15+00:00"
+    },
+    {
+      "content_id": "c1891801-c3aa-4384-ba0c-f5c3cfcbc8c6",
+      "creator_id": "writer-1",
+      "event": "appeal",
+      "reasoning": "I wrote this myself about my own grandmother. It is not AI-generated.",
+      "status": "under_review",
+      "timestamp": "2026-10-28T02:00:15+00:00"
     }
   ]
 }
