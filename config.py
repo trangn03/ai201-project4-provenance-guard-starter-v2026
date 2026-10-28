@@ -57,6 +57,11 @@ DETECTOR_MAX_TOKENS = 400
 WEIGHT_MODEL_SIGNAL = 0.5
 WEIGHT_STYLE_SIGNAL = 0.5
 
+# When the two signals disagree by more than this, `combine_signals` stops
+# trusting a flat average and leans toward whichever signal read more human
+# — see scoring.py::combine_signals for why.
+SIGNAL_DISAGREEMENT_THRESHOLD = 0.35
+
 
 # ─── Thresholds (Milestone 5) ────────────────────────────────────────────────
 # Where one label becomes another. Scores run 0.0 (confidently human) to 1.0

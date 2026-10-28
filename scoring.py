@@ -21,10 +21,7 @@ import config
 
 def combine_signals(model_score: float, style_score: float) -> float:
     """
-    Combine two 0–1 signals into one 0–1 score. ← TODO (Milestone 4)
-
-    Both inputs point the same way: higher means more likely AI. Your output
-    should too.
+    Combine two 0–1 signals into one 0–1 score.
 
     Args:
         model_score: from `detector.model_signal` — how predictable the text is.
@@ -33,30 +30,36 @@ def combine_signals(model_score: float, style_score: float) -> float:
     Returns:
         A float from 0.0 (confidently human) to 1.0 (confidently AI).
 
-    ⚠️ **Write the rule down before you code it, and put the numbers in your
-    README.** A weighted average is the obvious choice and it is not the only
-    one. Things worth thinking about:
+    The rule: a weighted average (`config.WEIGHT_MODEL_SIGNAL` /
+    `WEIGHT_STYLE_SIGNAL`) as the base case. But when the two signals disagree
+    by more than `config.SIGNAL_DISAGREEMENT_THRESHOLD`, a flat average isn't
+    trusted to cancel out to "unsure" — the result is pulled halfway toward
+    whichever signal read more human.
 
-      - **What happens when they disagree?** One signal at 0.9 and the other at
-        0.1 averages to 0.5 — "unsure". Is that what you want? It might be
-        exactly right: two methods disagreeing IS uncertainty. Or you might
-        decide one signal is more trustworthy when they split.
+    Why: a wrong accusation costs a writer more than a missed detection costs
+    the site (see criteria.md). When two independent methods split sharply,
+    that's a case to lean toward the writer in, not a case to average away.
 
-      - **Which way do you want to be wrong?** Weighting toward the signal that
-        reads more human means fewer false accusations and more AI text
-        getting through. There's no weighting that avoids the trade.
-
-      - Milestone 4 asks you to find a case where your two signals split and
-        write it down. That case is what this rule exists to handle.
-
-    The weights in config.py are placeholders. Change them, or ignore them and
-    write a different rule.
+    The case this handles: a text with ordinary vocabulary but genuinely
+    varied, idiosyncratic sentence structure — model_score ~0.73 (moderate
+    perplexity reads as somewhat AI-like), style_score ~0.23 (clearly human
+    shape: uneven sentence lengths, a semicolon, an em dash). A flat average
+    lands at ~0.48, barely inside "unsure." This rule pulls it to ~0.35 —
+    at the edge of "human" — because the style signal is picking up concrete,
+    checkable features the model signal can't see at all, and the cost of
+    being wrong favors that read.
     """
-    # TODO: replace this
-    return (
+    average = (
         config.WEIGHT_MODEL_SIGNAL * model_score
         + config.WEIGHT_STYLE_SIGNAL * style_score
     )
+
+    disagreement = abs(model_score - style_score)
+    if disagreement > config.SIGNAL_DISAGREEMENT_THRESHOLD:
+        more_human_reading = min(model_score, style_score)
+        average = (average + more_human_reading) / 2.0
+
+    return round(min(max(average, 0.0), 1.0), 4)
 
 
 def score_to_label(score: float) -> tuple[str, str]:

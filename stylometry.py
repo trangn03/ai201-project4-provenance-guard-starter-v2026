@@ -49,81 +49,110 @@ def words(text: str) -> list[str]:
 
 def sentence_length_spread(text: str) -> float:
     """
-    How much sentence length varies. ← TODO
+    How much sentence length varies, as a coefficient of variation.
 
     Returns:
-        A float. Decide yourself what scale it's on and which direction means
-        "more human" — then write that down, because your combining rule
-        depends on knowing it.
+        The standard deviation of per-sentence word counts divided by their
+        mean — unbounded but typically 0.0-1.5 in practice. Higher means
+        MORE human (lumpier sentence lengths); lower means more AI-like.
 
-    A hint on what you're reaching for: the standard deviation of sentence
-    lengths, probably divided by the mean so a long text and a short one are
-    comparable. `statistics.stdev` is imported for you.
-
-    Watch the edge case: a one-sentence submission has no spread at all, and
-    `stdev` raises on fewer than two values. Decide what that should return
-    before the attack set decides for you.
+        Fewer than two sentences, or a zero mean, has no spread to measure —
+        returns 0.0, which reads as maximally AI-like once this feeds
+        `style_signal`. That's a real limitation, not a neutral default: a
+        one-sentence submission gets treated as machine-like by this measure
+        alone, for having too little to go on rather than for any property
+        of the writing.
     """
-    # TODO: replace this
-    return 0.0
+    lengths = [len(words(s)) for s in sentences(text)]
+    if len(lengths) < 2:
+        return 0.0
+    mean = statistics.mean(lengths)
+    if mean == 0:
+        return 0.0
+    return statistics.stdev(lengths) / mean
 
 
 def type_token_ratio(text: str) -> float:
     """
-    Unique words over total words. ← TODO
+    Unique words over total words.
 
     Returns:
-        A float between 0 and 1. Higher means more varied vocabulary.
+        A float between 0 and 1. Higher means more varied vocabulary, which
+        reads as MORE human; lower (more repetition) reads as more AI-like.
+        0.0 for text with no words at all.
 
-    Worth knowing before you rely on it: this measure falls as text gets
-    longer, because common words repeat. Two texts of different lengths aren't
-    directly comparable on it, and if your test inputs vary a lot in length,
-    that alone can look like a signal.
+    Confound worth repeating: this falls as text gets longer regardless of
+    authorship, because common words repeat more over a longer stretch. Two
+    submissions of very different lengths aren't directly comparable on this
+    measure alone.
     """
-    # TODO: replace this
-    return 0.0
+    tokens = words(text)
+    if not tokens:
+        return 0.0
+    return len(set(tokens)) / len(tokens)
+
+
+_INTERESTING_PUNCTUATION = set(";:—()\"")
 
 
 def punctuation_density(text: str) -> float:
     """
-    How much punctuation, relative to length. ← TODO
+    How much "interesting" punctuation appears, relative to word count.
 
     Returns:
-        A float. Whether you count all punctuation or only some kinds — commas,
-        semicolons, dashes — is a real choice. Semicolons and em dashes are
-        more interesting than full stops, because they vary more between
-        writers.
+        Count of semicolons, colons, em dashes, parentheses, and quotation
+        marks, divided by word count. Unbounded in principle but small in
+        practice (commonly 0.0-0.3). Higher means MORE human; lower means
+        more AI-like.
+
+        Full stops, commas, and the bare apostrophe are deliberately excluded
+        — nearly everyone uses them (the apostrophe mostly for contractions
+        and possessives), so they carry little information about who's
+        writing. Semicolons, dashes, and parenthetical asides are closer to a
+        personal habit: some writers reach for them constantly, generated
+        text tends to reach for them rarely and evenly. 0.0 for text with no
+        words.
     """
-    # TODO: replace this
-    return 0.0
+    tokens = words(text)
+    if not tokens:
+        return 0.0
+    marks = sum(1 for ch in text if ch in _INTERESTING_PUNCTUATION)
+    return marks / len(tokens)
 
 
 # ── Combining them ───────────────────────────────────────────────────────────
 
+_SPREAD_CAP = 1.0    # coefficient of variation at/above this scores fully human
+_PUNCT_CAP = 0.3      # punctuation marks per word at/above this scores fully human
+
+
 def style_signal(text: str) -> float:
     """
-    The style signal as a 0–1 score. **Higher means more likely AI.** ← TODO
+    The style signal as a 0–1 score. **Higher means more likely AI.**
 
-    Combine your three measures into one number. Same direction as
-    `detector.model_signal`, so that `scoring.combine_signals` can treat them
-    the same way — if one of your signals runs backwards, everything above it
-    is wrong in a way that's hard to see.
+    All three measures point toward "more human" when they're HIGH (more
+    spread, more vocabulary variety, more interesting punctuation), so each
+    gets flipped to "how AI-like is a LOW reading on this" before combining:
 
-    Two things to decide and write down:
+        ai_from_spread = 1 - min(spread / _SPREAD_CAP, 1.0)
+        ai_from_ttr    = 1 - ttr                              (already 0-1)
+        ai_from_punct  = 1 - min(punct / _PUNCT_CAP, 1.0)
 
-      1. Which direction each measure points. Low spread means more AI-ish, so
-         it needs flipping. Work out which of your three need that.
-      2. How to get each onto a comparable scale. A raw type-token ratio sits
-         between 0 and 1; a raw punctuation count doesn't. Adding them
-         unscaled means whichever has the bigger numbers wins by default.
-
-    Test it on the four calibration inputs from Milestone 4 — clearly AI,
-    clearly human, plain conventional human writing, lightly-edited AI — before
-    you trust it. Plain and ordinary, not formal: formal prose reads as *human*
-    to signal one, and it is plain writing that gets accused.
+    The caps turn unbounded raw measures into comparable 0-1 scales before
+    averaging — without them, whichever measure happens to produce bigger raw
+    numbers would dominate the average by accident rather than by intent.
+    The three flipped scores are then averaged with equal weight.
     """
-    # TODO: replace this
-    return 0.5
+    spread = sentence_length_spread(text)
+    ttr = type_token_ratio(text)
+    punct = punctuation_density(text)
+
+    ai_from_spread = 1.0 - min(spread / _SPREAD_CAP, 1.0)
+    ai_from_ttr = 1.0 - ttr
+    ai_from_punct = 1.0 - min(punct / _PUNCT_CAP, 1.0)
+
+    score = (ai_from_spread + ai_from_ttr + ai_from_punct) / 3.0
+    return round(min(max(score, 0.0), 1.0), 4)
 
 
 if __name__ == "__main__":
@@ -139,4 +168,3 @@ if __name__ == "__main__":
     print(f"type_token_ratio         {type_token_ratio(text)}")
     print(f"punctuation_density      {punctuation_density(text)}")
     print(f"style_signal             {style_signal(text)}   (higher = more likely AI)")
-    print("\nAll zeros? These are stubs — Milestone 4 is where you build them.")

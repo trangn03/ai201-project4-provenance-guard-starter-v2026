@@ -109,16 +109,33 @@ shape reads as human.
 <!-- Write the rule in words, then give the numbers. What happens when the two
      signals disagree? -->
 
-**The rule:**
+**The rule:** a weighted average of `model_score` and `style_score` is the
+base case. But when the two disagree by more than a set threshold, a flat
+average isn't trusted to land honestly on "unsure" — the result is pulled
+halfway toward whichever signal read more human. A wrong accusation costs a
+writer more than a missed detection costs the site (see `criteria.md`), so
+when two independent methods split sharply, that split is a reason to lean
+toward the writer, not a reason to average the disagreement away.
 
-**The numbers:**
+**The numbers:** `WEIGHT_MODEL_SIGNAL = 0.5`, `WEIGHT_STYLE_SIGNAL = 0.5`,
+`SIGNAL_DISAGREEMENT_THRESHOLD = 0.35` (all in `config.py`).
 
 **Where it lives:** `scoring.py::combine_signals`
 
 <!-- ⚠️ The grader checks your code against that line. If your rule lives
      somewhere else, say where. -->
 
-**A case where my two signals split, and what my rule does with it:**
+**A case where my two signals split, and what my rule does with it:** a text
+with ordinary vocabulary but genuinely varied, idiosyncratic sentence
+structure (uneven sentence lengths, a semicolon, an em dash) scored
+`model_score = 0.7270` (moderate perplexity reads as somewhat AI-like) and
+`style_score = 0.2290` (the shape reads clearly human — exactly what the
+model signal can't see). The disagreement is 0.498, above the 0.35
+threshold. A flat average would land at 0.478 — barely inside "unsure." The
+disagreement rule instead pulls it to 0.3535, right at the edge of
+high-confidence human, because the style signal is picking up concrete,
+checkable structure that the model signal has no way to notice, and the cost
+of being wrong favors trusting that read.
 
 ---
 
@@ -158,12 +175,23 @@ shape reads as human.
 ```bash
 $ curl -X POST http://127.0.0.1:5000/submit \
   -H "Content-Type: application/json" \
-  -d '{"text": "...", "creator_id": "..."}'
+  -d '{"text": "My grandmother used to keep a jar of buttons on the windowsill, mismatched and rusted, and I never once saw her sew anything with them.", "creator_id": "writer-1"}'
 ```
 
 ```json
-
+{
+  "confidence": 0.0,
+  "content_id": "2ea5baca-dbdd-40ea-adbc-9fb9155b38aa",
+  "guess": "placeholder",
+  "label": "PLACEHOLDER — not scored yet.",
+  "model_score": 0.5675,
+  "style_score": null
+}
 ```
+
+<!-- Milestone 3 checkpoint: only the first signal is wired in. guess, label,
+     and style_score are still placeholders — confidence/label/style_score
+     fill in across Milestones 4 and 5. -->
 
 **An appeal**
 
@@ -174,17 +202,36 @@ $ curl -X POST http://127.0.0.1:5000/appeal \
 ```
 
 ```json
-
 ```
 
 **What the log shows afterwards**
 
+<!-- The appeal isn't built yet (Milestone 5) — this shows the submission's
+     log entry only. content_id matches the response above, and guess/label/
+     combined_score/style_score are present as null rather than missing,
+     which is what audit.py's nine-field-from-the-start design means. -->
+
 ```bash
-$ curl "http://127.0.0.1:5000/log?limit=3"
+$ curl "http://127.0.0.1:5000/log?limit=1"
 ```
 
 ```json
-
+{
+  "count": 1,
+  "entries": [
+    {
+      "combined_score": null,
+      "content_id": "2ea5baca-dbdd-40ea-adbc-9fb9155b38aa",
+      "creator_id": "writer-1",
+      "guess": null,
+      "label": null,
+      "model_score": 0.5675,
+      "status": "decided",
+      "style_score": null,
+      "timestamp": "2026-10-28T01:37:17+00:00"
+    }
+  ]
+}
 ```
 
 ---
@@ -218,7 +265,7 @@ $ curl "http://127.0.0.1:5000/log?limit=3"
      thresholds. Your numbers have to be liveable for the first and hostile to
      the second. -->
 
-**What a caller counts as:** 
+**What a caller counts as:**
 
 **The run of status codes when I pushed past it:**
 
