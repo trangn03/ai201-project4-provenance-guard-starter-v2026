@@ -61,7 +61,8 @@ holds on a lucky trial isn't a target.
 ## 2. Score spread
 
 A clearly-AI calibration text and a clearly-human calibration text score at
-least 0.4 apart on the combined score, in all 3 trials.
+least 0.4 apart on `combined_score` (read from the audit log entry for each
+submission, since the API response doesn't return it), in all 3 trials.
 
 **Why this target:** if the two most obvious cases I can construct land
 close together, the combined score isn't doing any separating work no matter
