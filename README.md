@@ -48,7 +48,9 @@
 4. **`scoring.py` `combine_signals(model_score, style_score)`** merges the two
    independent scores into one 0–1 score, using the weights in `config.py`.
 5. **`scoring.py` `score_to_label(score)`** maps that combined score to a
-   `(guess, label_text)` pair, using the thresholds in `config.py`.
+   `(guess, label_text)` pair, using the thresholds in `config.py`. `app.py`
+   separately derives `confidence` from how far the score sits past the
+   threshold it crossed (or past the unsure band's midpoint).
 6. **`audit.py` `log_decision(...)`** appends one line to `logs/audit.jsonl`
    with all nine required fields, regardless of what's returned to the caller.
 7. **`app.py`** returns `content_id`, `guess`, `confidence`, `label`,
@@ -283,9 +285,26 @@ $ curl "http://127.0.0.1:5000/log?limit=2"
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* a combining rule for `scoring.py::combine_signals` that
+  does something deliberate when the two signals disagree sharply, rather
+  than just using a flat weighted average — tied to the cost asymmetry
+  already written down in `criteria.md` (a wrong accusation costs a writer
+  more than a missed detection costs the site).
+- *What came back:* a rule with a disagreement threshold
+  (`SIGNAL_DISAGREEMENT_THRESHOLD` in `config.py`): below it, a plain
+  weighted average; above it, the result is pulled halfway toward whichever
+  signal read more human, instead of letting the two cancel out to a flat
+  "unsure." It came with a worked example from a real split case: `model_score
+  = 0.7270`, `style_score = 0.2290` — a flat average lands at 0.478, the
+  disagreement rule pulls it to 0.3535.
+- *What I changed:* nothing about the logic — I verified the worked numbers
+  myself by re-running `scoring.combine_signals` against that exact split
+  case and two non-disagreeing cases, to confirm the rule only kicks in where
+  it's supposed to and doesn't disturb scores that already agree. I did
+  rewrite the docstring and the README's combining-rule section to explain
+  *why* leaning toward the writer is the right default here, since the
+  original phrasing only described the mechanism, not the reasoning behind
+  it.
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
