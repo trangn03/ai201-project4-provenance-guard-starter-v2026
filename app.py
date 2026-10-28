@@ -203,12 +203,45 @@ def submit():
     import stylometry
     import scoring
 
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        audit.log_rejection(
+            creator_id="unknown",
+            reason="invalid_json",
+        )
+        return jsonify({
+            "error": "invalid_request",
+            "message": "Request body must be a JSON object.",
+        }), 400
+
     text = payload.get("text")
     creator_id = payload.get("creator_id")
 
+    if not isinstance(text, str) or not text.strip():
+        audit.log_rejection(
+            creator_id=creator_id if isinstance(creator_id, str) and creator_id.strip() else "unknown",
+            reason="invalid_text",
+            detail="text is required and must be a non-empty string.",
+        )
+        return jsonify({
+            "error": "invalid_request",
+            "message": "text is required and must be a non-empty string.",
+        }), 400
+
     content_id = str(uuid.uuid4())
-    model_score = detector.model_signal(text)
+    try:
+        model_score = detector.model_signal(text)
+    except ValueError as exc:
+        audit.log_rejection(
+            creator_id=creator_id if isinstance(creator_id, str) and creator_id.strip() else "unknown",
+            reason="text_too_short",
+            detail=str(exc),
+        )
+        return jsonify({
+            "error": "invalid_request",
+            "message": str(exc),
+        }), 400
+
     style_score = stylometry.style_signal(text)
     combined_score = scoring.combine_signals(model_score, style_score)
     guess, label = scoring.score_to_label(combined_score)
