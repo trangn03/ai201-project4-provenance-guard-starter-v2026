@@ -181,17 +181,17 @@ $ curl -X POST http://127.0.0.1:5000/submit \
 ```json
 {
   "confidence": 0.0,
-  "content_id": "2ea5baca-dbdd-40ea-adbc-9fb9155b38aa",
+  "content_id": "5a5941ef-468e-49f9-8e99-523940440c3a",
   "guess": "placeholder",
   "label": "PLACEHOLDER — not scored yet.",
   "model_score": 0.5675,
-  "style_score": null
+  "style_score": 0.68
 }
 ```
 
-<!-- Milestone 3 checkpoint: only the first signal is wired in. guess, label,
-     and style_score are still placeholders — confidence/label/style_score
-     fill in across Milestones 4 and 5. -->
+<!-- Milestone 4 checkpoint: both signals and combine_signals are wired in.
+     guess, confidence, and label are still placeholders — those fill in at
+     Milestone 5, once score_to_label is built. -->
 
 **An appeal**
 
@@ -220,15 +220,15 @@ $ curl "http://127.0.0.1:5000/log?limit=1"
   "count": 1,
   "entries": [
     {
-      "combined_score": null,
-      "content_id": "2ea5baca-dbdd-40ea-adbc-9fb9155b38aa",
+      "combined_score": 0.6238,
+      "content_id": "5a5941ef-468e-49f9-8e99-523940440c3a",
       "creator_id": "writer-1",
       "guess": null,
       "label": null,
       "model_score": 0.5675,
       "status": "decided",
-      "style_score": null,
-      "timestamp": "2026-10-28T01:37:17+00:00"
+      "style_score": 0.68,
+      "timestamp": "2026-10-28T01:49:32+00:00"
     }
   ]
 }
@@ -240,9 +240,23 @@ $ curl "http://127.0.0.1:5000/log?limit=1"
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* run both signals over four deliberately chosen
+  calibration inputs — clearly AI, clearly human, formal human writing, and
+  lightly-edited AI — and dig into the components if any score looked
+  surprising.
+- *What came back:* `formal_human`'s `style_score` (0.4736) looked too
+  neutral for dense, distinctive prose. Breaking down the three measures
+  separately showed `punctuation_density` at only 0.080 despite the text
+  containing a colon and two possessive apostrophes — because
+  `_INTERESTING_PUNCTUATION` included a bare `'`, which matches ordinary
+  contractions and possessives, not just real quotation marks. It was
+  double-counting the single most common punctuation mark in English as if
+  it were a rare, personal one.
+- *What I changed:* removed `'` from `_INTERESTING_PUNCTUATION` in
+  `stylometry.py`, keeping only `;:—()"`. Re-ran all four calibration texts
+  to confirm the fix moved the numbers in the direction expected
+  (`formal_human`'s punctuation reading dropped to a more honest 0.020) and
+  didn't break the two agreement cases.
 
 **Moment 2**
 
