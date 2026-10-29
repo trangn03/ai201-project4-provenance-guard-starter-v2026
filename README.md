@@ -312,24 +312,44 @@ $ curl "http://127.0.0.1:5000/log?limit=2"
 
 ## Rate Limiting
 
-**My limits:** ___ per minute, ___ per day
+**My limits:** 6 per minute, 100 per day
 
 **Why those numbers and not others:**
 
-<!-- Think about two people: a real writer submitting their own work a few
-     times an hour, and a script sending a thousand variations to map your
-     thresholds. Your numbers have to be liveable for the first and hostile to
-     the second. -->
+A real writer submitting their own work — drafting, revising, resubmitting a
+paragraph they reworded — fits comfortably inside 6 submissions in a minute
+and well under 100 in a day; nobody writes and resubmits faster than that by
+hand. A script trying to map where my thresholds sit needs many more data
+points than that to be useful: with each submission taking a second or two
+(the model runs inline), 6/minute already slows a sweep to a crawl, and
+100/day caps how much of that sweep can happen at all before the day's
+budget is gone. The per-minute number stops a burst; the per-day number
+stops someone from just submitting slowly to dodge the first limit.
 
 **What a caller counts as:**
 
+`app.py`'s `rate_limit_key()` keys by `creator_id` when the request body is a
+JSON object with a non-empty string `creator_id`, and falls back to the
+caller's IP address otherwise. That means one writer submitting from
+different machines still shares one limit, and a script that can't or
+doesn't send a `creator_id` is limited by address instead — it can't dodge
+the limit just by omitting the field.
+
 **The run of status codes when I pushed past it:**
 
-<!-- python run_attacks.py --flood 15 -->
-
+```bash
+$ python run_attacks.py --flood 15
 ```
 
 ```
+200 200 200 200 200 200 429 429 429 429 429 429 429 429 429
+```
+
+9 of 15 requests from the same `creator_id` were rate limited once the
+6-per-minute cap was crossed. The 429s were logged too — `audit.log_rejection`
+records `reason: "rate_limited"` and the limit string, so a flood leaves the
+same trace a legitimate burst wouldn't: many entries, same creator, all
+rejected in the same window.
 
 ---
 
