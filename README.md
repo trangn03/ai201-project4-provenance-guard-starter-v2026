@@ -919,13 +919,37 @@ that is a cost the service did not have before.
 
 ## What's Still Broken
 
-<!-- For each attack still getting through and each criterion still missed:
-     what you'd do, and why you stopped. -->
+**Why I stopped.** I made one improvement, as asked, and did not try any of
+the fixes below. That is the whole reason: it is not that I tried them and they
+failed. I did not have a reason to think any of them is quick, because each
+one trades a wrong accusation for a missed detection or the reverse, and I only
+have eight human false-positive texts and ten of my own paragraphs to judge
+that trade with. Where I give a number below it is arithmetic on scores I
+already have, not a result from a run.
 
-**The trade I'd make if this ran for real:**
+**Criteria still missed: none.** All five held in every trial after the change
+(criterion 5 went from MISSED to MET). Three of those passes are weaker than
+they look, and the first is the one I would tighten: criterion 1 passed only
+because my paragraphs are longer and more uneven than the plain writing it was
+written about (see the Diagnoses section above), criterion 2 holds by
+0.02, and criterion 3 is satisfied by calibration texts I picked.
 
-<!-- Two sentences. Fewer wrong accusations means more AI text getting through.
-     Say which way you'd go and WHO PAYS FOR IT. -->
+**The 17 attacks that still get through**, by cause:
+
+| Attacks | Cause (stage) | What I'd do | Why I didn't |
+| ------- | ------------- | ----------- | ------------ |
+| FP02, FP03, FP04, FP05, FP06, FP07 — human writing accused (0.711–0.757) | signal one and signal two agree that plain, formal or repetitive text is AI | Raise `AI_THRESHOLD` from 0.65 to about 0.76, which sits just above the highest of the six (0.757). The alternative, a perplexity midpoint tuned for plain English (`detector.py`, currently 45), needs calibration data I don't have. | Moving the threshold clears all six, but pushes my clearly-AI calibration text (0.7364) into "unsure", so criterion 3's AI label would depend on EV10-style text (0.871). It trades the accusation I care about most for missed AI, which I judged the right trade but did not make without checking it against more AI samples. Reweighting does not work: at 0.3 / 0.7 all six stay above 0.65. |
+| EV03, EV04, EV07, EV09 — AI text called "unsure" by 0.01–0.05 | label mapping: the unmodified AI text only reaches 0.663 against an `AI_THRESHOLD` of 0.65 | Lower `AI_THRESHOLD` to about 0.60, which catches all four (0.604, 0.631, 0.624, 0.633). | It also moves FP01 (human writing, 0.614) from unsure to AI, so seven of the eight human texts would be accused instead of six. That is the trade the other direction, and it contradicts the first row. These two rows cannot both be fixed by the threshold; the real problem is that neither signal gives AI text a high score. |
+| EV01 (typos → human), PI02 (fake system line → human) | signal one reads odd text as unpredictable, and the combining rule's disagreement pull then halves the distance to the human reading | Cap the pull, or score perplexity on a robust statistic (the median per-sentence value) so one strange line cannot dominate. | The pull is a deliberate choice documented in `scoring.py::combine_signals` (a wrong accusation costs more than a miss), so removing it moves the service toward accusing more people. I'd want to test a cap against the human texts before touching it. |
+| EV02, EV06 (broken-up sentences, one long and one short) | signal two: sentence-length spread is easy to inflate | Replace spread with a measure that is harder to game, or accept it. | Signal two has three simple measures and no better one yet; this is the cheapest attack on it and any fix is a new signal, not a tweak. |
+| EV05 (heavy human edit) | both signals, correctly | Nothing. | A real rewrite of AI text is partly human writing, and "unsure" is a defensible answer. I would not call this a bug. |
+| EV08 (65-character text) | signal one has too little context for a stable perplexity | Refuse text under about 20 words, or force "unsure" below it. | It would refuse FP08 ("Went for a run. Legs hurt. Worth it.", 8 words), a real short submission that today gets "unsure". Same trade as the length checks I added. |
+| MF07 (right-to-left script accused at 0.953) | signal two: `stylometry.py::words` only matches `[a-z0-9']`, so non-Latin text has no words and scores 1.0; signal one is an English model | Match Unicode letters in `words`, and force "unsure" for text that is mostly non-Latin, since neither signal is built for it. | It needs a language or script check I did not write. This is a real writer in another language accused with high confidence, so it is the one I'd do first. |
+
+Not on the list because they held: EV10, FP01, FP08, PI01, PI03–PI06 and all
+of the flood and malformed rows except the five fixed.
+
+**The trade I'd make if this ran for real:** I would go toward fewer wrong accusations: raise `AI_THRESHOLD` toward 0.76 and add a script check for MF07, accepting that AI text like EV03, EV04, EV07 and EV09 gets through as "unsure". The people who pay are the site and the honest writers whose work competes with AI text that was not caught, and I would rather they pay than a writer who is told their own work is machine-made and has only the appeal to answer with.
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
