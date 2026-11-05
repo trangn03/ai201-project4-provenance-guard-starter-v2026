@@ -46,6 +46,24 @@ DETECTOR_MODEL = os.getenv("AI201_DETECTOR_MODEL", "gpt2")
 # 300 words, which is enough for the signal to mean something.
 DETECTOR_MAX_TOKENS = 400
 
+# ─── Input validation (Unit 8 improvement) ───────────────────────────────────
+#
+# What `/submit` refuses before either signal sees the text. Each of these was
+# a before-run failure: an oversized body scored as ordinary text (criterion 5),
+# and emoji-only, punctuation-only, control-character and one-word inputs got a
+# confident verdict on text with nothing to read.
+#
+# 20,000 characters is about 3,500 words — over ten times what the detector
+# reads (400 tokens is roughly 1,600 characters), so rejecting longer text
+# loses no signal, only the cost of scanning it.
+MAX_TEXT_CHARS = 20_000
+
+# Words that contain at least one letter, in any script. Five is deliberately
+# low: "Went for a run. Legs hurt. Worth it." (8 words) is a real submission.
+# Letters are checked with str.isalpha, not [a-z], so Arabic, Hebrew and
+# other non-Latin writing counts as writing.
+MIN_WORDS = 5
+
 
 # ─── Scoring (Milestone 4) ───────────────────────────────────────────────────
 # How much each signal counts toward the combined score.

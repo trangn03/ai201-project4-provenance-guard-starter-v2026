@@ -24,6 +24,7 @@ Routes:
     GET  /health      is the service up, and is the model loaded
 """
 
+import re
 import uuid
 
 from flask import Flask, jsonify, request
@@ -150,6 +151,30 @@ def health():
 
 # ── YOU BUILD THIS ────────────────────────────────────────────────────────────
 
+# Control characters other than tab, newline and carriage return.
+_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def check_text(text: str):
+    """
+    Checks run on the text before either signal sees it.
+
+    Returns None if the text is fine, else (status, reason, detail) for the
+    caller to log and answer with. These limits live in config.py.
+    """
+    if len(text) > config.MAX_TEXT_CHARS:
+        return (413, "text_too_long",
+                f"Text is over {config.MAX_TEXT_CHARS:,} characters.")
+    if _CONTROL_CHARS.search(text):
+        return (400, "invalid_characters",
+                "Text contains control characters.")
+    words = [w for w in text.split() if any(ch.isalpha() for ch in w)]
+    if len(words) < config.MIN_WORDS:
+        return (400, "text_too_short",
+                f"Text needs at least {config.MIN_WORDS} words that contain letters.")
+    return None
+
+
 @app.post("/submit")
 @limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
 def submit():
@@ -217,6 +242,19 @@ def submit():
     text = payload.get("text")
     creator_id = payload.get("creator_id")
 
+    # A missing creator_id is allowed (it's logged as null); a creator_id that
+    # isn't a string is not, or it would be written to the audit log as-is.
+    if creator_id is not None and not isinstance(creator_id, str):
+        audit.log_rejection(
+            creator_id="unknown",
+            reason="invalid_creator_id",
+            detail="creator_id must be a string.",
+        )
+        return jsonify({
+            "error": "invalid_request",
+            "message": "creator_id must be a string.",
+        }), 400
+
     if not isinstance(text, str) or not text.strip():
         audit.log_rejection(
             creator_id=creator_id if isinstance(creator_id, str) and creator_id.strip() else "unknown",
@@ -227,6 +265,19 @@ def submit():
             "error": "invalid_request",
             "message": "text is required and must be a non-empty string.",
         }), 400
+
+    problem = check_text(text)
+    if problem:
+        status, reason, detail = problem
+        audit.log_rejection(
+            creator_id=creator_id if isinstance(creator_id, str) and creator_id.strip() else "unknown",
+            reason=reason,
+            detail=detail,
+        )
+        return jsonify({
+            "error": "invalid_request",
+            "message": detail,
+        }), status
 
     content_id = str(uuid.uuid4())
     try:
