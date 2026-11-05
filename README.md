@@ -887,7 +887,11 @@ used to get a verdict:
 | 4. Appeal path | 10 of 10, every trial — MET | 10 of 10, every trial — **MET** |
 | 5. Bad input | missing 400, empty 400, 50,000 words **200** — MISSED | missing 400, empty 400, 50,000 words **413**, in every trial — **MET** |
 
-**Did it help, and how do I know:** it helped where it was aimed and nowhere
+**Did it help, and how do I know:** partly, and not on the problem that
+matters most. It fixed the one missed criterion and 5 of 22 broken attacks, but
+none of those 5 involves a real writer being accused. The 6 human texts the
+service calls AI (FP02–FP07) are exactly as wrong as before, so for the person
+this service can hurt, it did not help. It helped where it was aimed and nowhere
 else. Broken attacks went from 22 to 17, and criterion 5 went from MISSED to
 MET. The 5 attacks it fixed are MF03, MF04, MF05, MF06 (text with nothing to
 read now gets a 400 instead of a confident verdict) and RQ06 (a dict
