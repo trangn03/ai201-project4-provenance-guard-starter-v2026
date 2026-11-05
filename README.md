@@ -553,36 +553,42 @@ FP03, a non-native English speaker writing carefully about their first month in 
 
 <!-- Your five criteria across three trials. `run_eval.py --label before`. -->
 
+Run with `python run_eval.py --label before` (report: `results/run_2026-11-04_1739_before.md`)
+for criteria 1, 2, 3 and 5. Criterion 2's `combined_score` is not in the API
+response, so it was read from the audit log (`eval_score spread_1` / `_2`).
+Criterion 4 can't be expressed as a scenario (it needs the `content_id` a
+submission returned), so it was run with `python appeal_check.py`.
+
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 | --------- | ------ | ----- | ----- | ----- | ------- |
-| 1.        |        |       |       |       |         |
-| 2.        |        |       |       |       |         |
-| 3.        |        |       |       |       |         |
-| 4.        |        |       |       |       |         |
-| 5.        |        |       |       |       |         |
+| 1. False positives | at most 1 of 10 of my own paragraphs labeled AI, in every trial | 0 of 10 AI (1 human, 9 unsure) | 0 of 10 AI (1 human, 9 unsure) | 0 of 10 AI (1 human, 9 unsure) | **Met** |
+| 2. Score spread | clearly-AI and clearly-human texts at least 0.4 apart on `combined_score`, every trial | 0.7364 − 0.3165 = 0.420 | 0.420 | 0.420 | **Met** (by 0.02) |
+| 3. Label coverage | each of human / unsure / AI produced by at least one of 4 calibration inputs in at least 2 of 3 trials | ai, human, unsure, unsure — all 3 labels | all 3 labels | all 3 labels | **Met** |
+| 4. Appeal path | 10 of 10 appeals set `under_review` and sit beside the original entry | 10 of 10 | 10 of 10 | 10 of 10 | **Met** |
+| 5. Bad input | missing, empty and 50,000-word `text` each return a 4xx, no 5xx, every trial | missing 400, empty 400, 50,000 words **200 (labeled AI, 0.9988)** | same | same | **Missed** |
 
 **Real output from one trial**, pasted as text, naming the file and function
 that produced it:
 
-```json
+Criterion 5, trial 1 — `run_eval.py::main` posting the 50,000-word body to
+`app.py::submit`, as recorded in the audit log by `audit.log_decision`:
 
+```json
+{"timestamp": "2026-11-05T01:39:08+00:00", "content_id": "b29f16a6-5690-4d9a-82cf-8fd553cd281e", "creator_id": "eval_bad_huge", "guess": "ai", "model_score": 0.9975, "style_score": 1.0, "combined_score": 0.9988}
+```
+
+and the two rejected inputs from the same trial, written by `audit.log_rejection`:
+
+```json
+{"timestamp": "2026-11-05T01:39:05+00:00", "creator_id": "eval_bad_missing", "event": "rejected", "status": "rejected", "reason": "invalid_text", "detail": "text is required and must be a non-empty string."}
+{"timestamp": "2026-11-05T01:39:05+00:00", "creator_id": "eval_bad_empty", "event": "rejected", "status": "rejected", "reason": "invalid_text", "detail": "text is required and must be a non-empty string."}
 ```
 
 **Diagnoses**
 
-<!-- For each miss AND each broken attack: the stage and the mechanism.
-
-     Your service has five stages: the route, signal one, signal two, the
-     combining rule, and the label mapping.
-
-     Not a diagnosis:  "The evasion attacks got through."
-     A diagnosis:      "Four evasion inputs got through. All four had typos
-                        added to AI-generated text. My second signal measures
-                        word variety, and typos raise word variety — so it read
-                        them as more human. My combining rule weights that
-                        signal at 0.6, so it dragged the whole score down."
-
-     Look for a pattern. Five failures on one signal is one problem, not five. -->
+- **Criterion 5 (missed, route stage).** `app.py::submit` checks that `text` is a non-empty string and long enough, but has no maximum length, so a 50,000-word body is scored like any other input. It also scores as a confident AI result (0.9988): signal one only reads the first `DETECTOR_MAX_TOKENS` (400) tokens, and the repeated word `word word word…` is maximally predictable, while signal two sees uniform sentence structure. The same gap showed up in the attack run, where a 57,640-character input (MF08) came back 200. One missing check, not three problems.
+- **Criterion 2 (met, but only by 0.02).** The margin is thin because the clearly-human calibration text only reaches 0.3165, just under `HUMAN_THRESHOLD` (0.35); the combining rule compresses even obviously human text toward the middle, and only very casual writing reaches the human label at all.
+- **Criterion 1 (met, but weakly).** None of my ten paragraphs was accused, but 9 of 10 landed in unsure rather than human. Formal-register school writing sits in the middle of the scale, which matches the attack run where formal-register human text (FP02–FP07) was labeled AI.
 
 ---
 
