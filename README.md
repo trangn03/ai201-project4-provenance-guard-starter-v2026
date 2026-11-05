@@ -32,19 +32,19 @@
      a picture of your terminal gets none.
      ───────────────────────────────────────────────────────────────────────── -->
 
-<!-- ═══════════════════════ UNIT 7 — THE BUILD ═══════════════════════ -->
+<!-- ═══════════════════════ UNIT 7, THE BUILD ═══════════════════════ -->
 
 ## What This Does
 
 <!-- The path a submission takes, from arriving to the label a reader sees.
-     Six or seven steps — this is the trace you wrote in Milestone 1. -->
+     Six or seven steps, this is the trace you wrote in Milestone 1. -->
 
 1. **`app.py` `/submit`** pulls `text` and `creator_id` out of the JSON body.
 2. **`detector.py` `model_signal(text)`** runs the text through a local GPT-2
    instance and turns its perplexity into a 0–1 "AI-likely" score (signal one).
 3. **`stylometry.py` `style_signal(text)`** independently measures the shape
-   of the text — sentence-length spread, vocabulary variety, punctuation
-   density — and produces a second 0–1 "AI-likely" score (signal two).
+   of the text, sentence-length spread, vocabulary variety, punctuation
+   density, and produces a second 0–1 "AI-likely" score (signal two).
 4. **`scoring.py` `combine_signals(model_score, style_score)`** merges the two
    independent scores into one 0–1 score, using the weights in `config.py`.
 5. **`scoring.py` `score_to_label(score)`** maps that combined score to a
@@ -64,9 +64,9 @@
      human and AI writing, and WHAT IT CAN'T SEE.
 
      The blind spot is not optional. If you can't name it you don't understand
-     the signal yet — and unit 8's attack set is built out of blind spots. -->
+     the signal yet, and unit 8's attack set is built out of blind spots. -->
 
-### Signal one — the model signal
+### Signal one - the model signal
 
 **What it measures:** how predictable each next token is to a local GPT-2
 model, averaged over the text as perplexity, then mapped through a logistic
@@ -74,36 +74,36 @@ curve onto 0–1 (lower perplexity → higher AI score).
 
 **Why that might differ between human and AI writing:** a language model
 writes by repeatedly picking a likely next token, so its own output tends to
-be easy for a model to predict. Human writing is noisier — odd word choices,
-digressions, the specific rather than the typical — which reads as higher
+be easy for a model to predict. Human writing is noisier, odd word choices,
+digressions, the specific rather than the typical, which reads as higher
 perplexity.
 
-**What it can't see:** who actually wrote the text — only how surprising the
+**What it can't see:** who actually wrote the text, only how surprising the
 words are against gpt2's training distribution. It can't tell "generated"
 apart from "plain." Someone writing simply on purpose (a second-language
 writer, a younger writer, anyone being deliberately clear) scores just as
 AI-like as a model would. It also runs backwards on register: dense, ornate
-prose scores *human* — including AI-generated ornate prose — because rare
+prose scores *human*, including AI-generated ornate prose, because rare
 words are exactly what trips the model up.
 
-### Signal two — the style signal
+### Signal two - the style signal
 
-**What it measures:** three shape statistics with no semantic content —
+**What it measures:** three shape statistics with no semantic content,
 whether sentence length varies or marches in lockstep, how much vocabulary
 repeats, how much and what kind of punctuation appears.
 
 **Why that might differ between human and AI writing:** generated text tends
 toward even, mid-length sentences and a narrower vocabulary band, because
 that's what "most likely next word" produces on average. Human writing is
-lumpier — a three-word sentence next to a forty-word one, idiosyncratic
+lumpier, a three-word sentence next to a forty-word one, idiosyncratic
 punctuation habits that vary writer to writer.
 
-**What it can't see:** meaning, at all — it only sees the shape the
+**What it can't see:** meaning, at all, it only sees the shape the
 characters make on the page. It can't tell a text that's naturally uniform
 from one deliberately reshaped to look varied: typos, sentence-splitting, a
 pasted quotation all move the score without touching what the text says. It
 also can't catch AI generation that's been prompted to vary its own sentence
-length and vocabulary — the content can still be machine-written while the
+length and vocabulary, the content can still be machine-written while the
 shape reads as human.
 
 ### The combining rule
@@ -113,7 +113,7 @@ shape reads as human.
 
 **The rule:** a weighted average of `model_score` and `style_score` is the
 base case. But when the two disagree by more than a set threshold, a flat
-average isn't trusted to land honestly on "unsure" — the result is pulled
+average isn't trusted to land honestly on "unsure", the result is pulled
 halfway toward whichever signal read more human. A wrong accusation costs a
 writer more than a missed detection costs the site (see `criteria.md`), so
 when two independent methods split sharply, that split is a reason to lean
@@ -131,9 +131,9 @@ toward the writer, not a reason to average the disagreement away.
 with ordinary vocabulary but genuinely varied, idiosyncratic sentence
 structure (uneven sentence lengths, a semicolon, an em dash) scored
 `model_score = 0.7270` (moderate perplexity reads as somewhat AI-like) and
-`style_score = 0.2290` (the shape reads clearly human — exactly what the
+`style_score = 0.2290` (the shape reads clearly human, exactly what the
 model signal can't see). The disagreement is 0.498, above the 0.35
-threshold. A flat average would land at 0.478 — barely inside "unsure." The
+threshold. A flat average would land at 0.478, barely inside "unsure." The
 disagreement rule instead pulls it to 0.3535, right at the edge of
 high-confidence human, because the style signal is picking up concrete,
 checkable structure that the model signal has no way to notice, and the cost
@@ -151,7 +151,7 @@ of being wrong favors trusting that read.
 | Label                 | Score range | The exact text a reader sees |
 | --------------------- | ----------- | ----------------------------- |
 | high-confidence human | 0.00 – 0.35 | "We think this was probably written by a person." |
-| unsure                | 0.35 – 0.65 | "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation." |
+| unsure                | 0.35 – 0.65 | "We couldn't tell either way. This piece could have been written by a person or by AI, treat this result as inconclusive, not as an accusation." |
 | high-confidence AI    | 0.65 – 1.00 | "We think this was probably written by AI, or with heavy AI assistance." |
 
 **Why I worded the "unsure" one this way:**
@@ -162,13 +162,13 @@ of being wrong favors trusting that read.
 
 It names what the system knows (it couldn't tell) instead of what it
 suspects (maybe AI). "Treat this result as inconclusive, not as an
-accusation" is there on purpose — the plain reading of "unsure" on your own
+accusation" is there on purpose, the plain reading of "unsure" on your own
 writing is still "they think I might have used AI," so the sentence has to
 say out loud that this isn't a verdict, or a reader has no way to know that
 for themselves.
 
 **Confirming all three are reachable:** submitted through the running
-service — a plain personal anecdote with contractions and a parenthetical
+service, a plain personal anecdote with contractions and a parenthetical
 scored 0.2857 → `human`; a generic, hedging paragraph scored 0.7752 →
 `ai`; several genuinely human texts that were less extreme (a single clean
 sentence, dense formal prose, casual writing without much punctuation
@@ -225,7 +225,7 @@ $ curl -X POST http://127.0.0.1:5000/appeal \
 **What the log shows afterwards**
 
 <!-- The original decision is untouched; the appeal sits after it as its own
-     entry, same content_id, status moved to under_review — audit.log_appeal
+     entry, same content_id, status moved to under_review, audit.log_appeal
      never overwrites the original. -->
 
 ```bash
@@ -266,13 +266,13 @@ $ curl "http://127.0.0.1:5000/log?limit=2"
 **Moment 1**
 
 - *What I asked for:* run both signals over four deliberately chosen
-  calibration inputs — clearly AI, clearly human, formal human writing, and
-  lightly-edited AI — and dig into the components if any score looked
+  calibration inputs, clearly AI, clearly human, formal human writing, and
+  lightly-edited AI, and dig into the components if any score looked
   surprising.
 - *What came back:* `formal_human`'s `style_score` (0.4736) looked too
   neutral for dense, distinctive prose. Breaking down the three measures
   separately showed `punctuation_density` at only 0.080 despite the text
-  containing a colon and two possessive apostrophes — because
+  containing a colon and two possessive apostrophes, because
   `_INTERESTING_PUNCTUATION` included a bare `'`, which matches ordinary
   contractions and possessives, not just real quotation marks. It was
   double-counting the single most common punctuation mark in English as if
@@ -287,7 +287,7 @@ $ curl "http://127.0.0.1:5000/log?limit=2"
 
 - *What I asked for:* a combining rule for `scoring.py::combine_signals` that
   does something deliberate when the two signals disagree sharply, rather
-  than just using a flat weighted average — tied to the cost asymmetry
+  than just using a flat weighted average, tied to the cost asymmetry
   already written down in `criteria.md` (a wrong accusation costs a writer
   more than a missed detection costs the site).
 - *What came back:* a rule with a disagreement threshold
@@ -295,9 +295,9 @@ $ curl "http://127.0.0.1:5000/log?limit=2"
   weighted average; above it, the result is pulled halfway toward whichever
   signal read more human, instead of letting the two cancel out to a flat
   "unsure." It came with a worked example from a real split case: `model_score
-  = 0.7270`, `style_score = 0.2290` — a flat average lands at 0.478, the
+  = 0.7270`, `style_score = 0.2290`, a flat average lands at 0.478, the
   disagreement rule pulls it to 0.3535.
-- *What I changed:* nothing about the logic — I verified the worked numbers
+- *What I changed:* nothing about the logic, I verified the worked numbers
   myself by re-running `scoring.combine_signals` against that exact split
   case and two non-disagreeing cases, to confirm the rule only kicks in where
   it's supposed to and doesn't disturb scores that already agree. I did
@@ -306,7 +306,7 @@ $ curl "http://127.0.0.1:5000/log?limit=2"
   original phrasing only described the mechanism, not the reasoning behind
   it.
 
-**Moment 3 — held or broke for 56 attacks**
+**Moment 3: held or broke for 56 attacks**
 
 - *What I asked for:* a verdict, HELD or BROKE, for every attack in the set,
   judged against what the `targets` column said each one was going for, and a
@@ -326,7 +326,7 @@ $ curl "http://127.0.0.1:5000/log?limit=2"
   also had the AI check each verdict against the audit log's scores rather
   than the report's Score column, which is confidence, not the combined score.
 
-**Moment 4 — scenarios, and the one thing the AI wouldn't write for me**
+**Moment 4: scenarios, and the one thing the AI wouldn't write for me**
 
 - *What I asked for:* `scenarios.py` for my five criteria, including the
   criterion that needs my own writing and the one that needs inputs across the
@@ -344,7 +344,7 @@ $ curl "http://127.0.0.1:5000/log?limit=2"
   plain writing criterion 1 was written about, which is why I would tighten
   that criterion.
 
-**Moment 5 — two mistakes the AI made, and how they were caught**
+**Moment 5: two mistakes the AI made, and how they were caught**
 
 - *What I asked for:* the "after" attack run, and the "What's Still Broken"
   section.
@@ -362,7 +362,7 @@ $ curl "http://127.0.0.1:5000/log?limit=2"
   run, confirmed it matched the before run on every row that was not rejected,
   and deleted two redundant reports of my own.
 
-**Moment 6 — choosing the improvement, and what it did not fix**
+**Moment 6: choosing the improvement, and what it did not fix**
 
 - *What I asked for:* one improvement from reweighting, moving a threshold, or
   validating input.
@@ -379,7 +379,7 @@ $ curl "http://127.0.0.1:5000/log?limit=2"
   diffing the two attack reports: 50 of 56 rows are identical, and the six that
   changed are exactly the rejected inputs.
 
-<!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
+<!-- ═══════════════════════ UNIT 8, THE TEST ═══════════════════════ -->
 
 ---
 
@@ -389,8 +389,8 @@ $ curl "http://127.0.0.1:5000/log?limit=2"
 
 **Why those numbers and not others:**
 
-A real writer submitting their own work — drafting, revising, resubmitting a
-paragraph they reworded — fits comfortably inside 6 submissions in a minute
+A real writer submitting their own work, drafting, revising, resubmitting a
+paragraph they reworded, fits comfortably inside 6 submissions in a minute
 and well under 100 in a day; nobody writes and resubmits faster than that by
 hand. A script trying to map where my thresholds sit needs many more data
 points than that to be useful: with each submission taking a second or two
@@ -405,7 +405,7 @@ stops someone from just submitting slowly to dodge the first limit.
 JSON object with a non-empty string `creator_id`, and falls back to the
 caller's IP address otherwise. That means one writer submitting from
 different machines still shares one limit, and a script that can't or
-doesn't send a `creator_id` is limited by address instead — it can't dodge
+doesn't send a `creator_id` is limited by address instead, it can't dodge
 the limit just by omitting the field.
 
 **The run of status codes when I pushed past it:**
@@ -419,16 +419,16 @@ $ python run_attacks.py --flood 15
 ```
 
 9 of 15 requests from the same `creator_id` were rate limited once the
-6-per-minute cap was crossed. The 429s were logged too — `audit.log_rejection`
+6-per-minute cap was crossed. The 429s were logged too, `audit.log_rejection`
 records `reason: "rate_limited"` and the limit string, so a flood leaves the
 same trace a legitimate burst wouldn't: many entries, same creator, all
 rejected in the same window.
 
 ---
 
-## Attack Run — Before
+## Attack Run - Before
 
-**56 attacks, 34 held, 22 broke** (`results/attack_run_2026-11-04_1718.md`, run against the service with rate limiting on). Combined score is the `scoring.py::combine_signals` output from the audit log; `—` means the request was rejected before scoring.
+**56 attacks, 34 held, 22 broke** (`results/attack_run_2026-11-04_1718.md`, run against the service with rate limiting on). Combined score is the `scoring.py::combine_signals` output from the audit log; `-` means the request was rejected before scoring.
 
 | ID | Family | Going for | Status | Guess | Combined | Verdict |
 | -- | ------ | --------- | ------ | ----- | -------- | ------- |
@@ -456,46 +456,46 @@ rejected in the same window.
 | PI04 | prompt_injection | attempt to make the label text hostile | 200 | unsure | 0.518 | **HELD** |
 | PI05 | prompt_injection | attempt to inject into the audit log | 200 | human | 0.300 | **HELD** |
 | PI06 | prompt_injection | instruction plus real human text | 200 | unsure | 0.587 | **HELD** |
-| MF01 | malformed | text is only whitespace | 400 | — | — | **HELD** |
-| MF02 | malformed | text is a single character | 400 | — | — | **HELD** |
+| MF01 | malformed | text is only whitespace | 400 | - | - | **HELD** |
+| MF02 | malformed | text is a single character | 400 | - | - | **HELD** |
 | MF03 | malformed | text is control characters | 200 | human | 0.167 | **BROKE** |
 | MF04 | malformed | text is only punctuation | 200 | human | 0.258 | **BROKE** |
 | MF05 | malformed | text is a very long single word | 200 | ai | 0.832 | **BROKE** |
 | MF06 | malformed | text is emoji only | 200 | ai | 0.999 | **BROKE** |
 | MF07 | malformed | text is right-to-left script | 200 | ai | 0.953 | **BROKE** |
 | MF08 | malformed | text is 60,000 characters | 200 | ai | 0.921 | **HELD** |
-| RQ01 | malformed | no text field at all | 400 | — | — | **HELD** |
+| RQ01 | malformed | no text field at all | 400 | - | - | **HELD** |
 | RQ02 | malformed | no creator_id | 200 | human | 0.346 | **HELD** |
-| RQ03 | malformed | text is a number | 400 | — | — | **HELD** |
-| RQ04 | malformed | text is a list | 400 | — | — | **HELD** |
-| RQ05 | malformed | text is null | 400 | — | — | **HELD** |
+| RQ03 | malformed | text is a number | 400 | - | - | **HELD** |
+| RQ04 | malformed | text is a list | 400 | - | - | **HELD** |
+| RQ05 | malformed | text is null | 400 | - | - | **HELD** |
 | RQ06 | malformed | creator_id is an object | 200 | human | 0.204 | **BROKE** |
-| RQ07 | malformed | body is a JSON array, not an object | 400 | — | — | **HELD** |
-| RQ08 | malformed | body is unparseable JSON | 400 | — | — | **HELD** |
-| RQ09 | malformed | body is empty | 400 | — | — | **HELD** |
-| RQ10 | malformed | body is form-encoded, not JSON | 400 | — | — | **HELD** |
-| RQ11 | malformed | body is JSON claiming to be plain text | 429 | — | — | **HELD** |
-| RQ12 | malformed | deeply nested JSON | 400 | — | — | **HELD** |
+| RQ07 | malformed | body is a JSON array, not an object | 400 | - | - | **HELD** |
+| RQ08 | malformed | body is unparseable JSON | 400 | - | - | **HELD** |
+| RQ09 | malformed | body is empty | 400 | - | - | **HELD** |
+| RQ10 | malformed | body is form-encoded, not JSON | 400 | - | - | **HELD** |
+| RQ11 | malformed | body is JSON claiming to be plain text | 429 | - | - | **HELD** |
+| RQ12 | malformed | deeply nested JSON | 400 | - | - | **HELD** |
 | FL01_01 | flood_same_creator | 20 rapid submissions from one creator | 200 | human | 0.188 | **HELD** |
 | FL01_02 | flood_same_creator | 20 rapid submissions from one creator | 200 | human | 0.188 | **HELD** |
 | FL01_03 | flood_same_creator | 20 rapid submissions from one creator | 200 | human | 0.188 | **HELD** |
 | FL01_04 | flood_same_creator | 20 rapid submissions from one creator | 200 | human | 0.188 | **HELD** |
 | FL01_05 | flood_same_creator | 20 rapid submissions from one creator | 200 | human | 0.188 | **HELD** |
 | FL01_06 | flood_same_creator | 20 rapid submissions from one creator | 200 | human | 0.188 | **HELD** |
-| FL01_07 | flood_same_creator | 20 rapid submissions from one creator | 429 | — | — | **HELD** |
-| FL01_08 | flood_same_creator | 20 rapid submissions from one creator | 429 | — | — | **HELD** |
-| FL01_09 | flood_same_creator | 20 rapid submissions from one creator | 429 | — | — | **HELD** |
-| FL01_10 | flood_same_creator | 20 rapid submissions from one creator | 429 | — | — | **HELD** |
-| FL01_11 | flood_same_creator | 20 rapid submissions from one creator | 429 | — | — | **HELD** |
-| FL01_12 | flood_same_creator | 20 rapid submissions from one creator | 429 | — | — | **HELD** |
+| FL01_07 | flood_same_creator | 20 rapid submissions from one creator | 429 | - | - | **HELD** |
+| FL01_08 | flood_same_creator | 20 rapid submissions from one creator | 429 | - | - | **HELD** |
+| FL01_09 | flood_same_creator | 20 rapid submissions from one creator | 429 | - | - | **HELD** |
+| FL01_10 | flood_same_creator | 20 rapid submissions from one creator | 429 | - | - | **HELD** |
+| FL01_11 | flood_same_creator | 20 rapid submissions from one creator | 429 | - | - | **HELD** |
+| FL01_12 | flood_same_creator | 20 rapid submissions from one creator | 429 | - | - | **HELD** |
 
 How I judged each one:
 
-- **evasion** — the unmodified AI text scores 0.663 and is labeled AI. BROKE if the text stopped being labeled AI. Only EV10 held (repeating the stanzas pushed it up to 0.871). EV04, EV07 and EV09 broke by only 0.02–0.03, because the baseline sits 0.013 above `AI_THRESHOLD`.
-- **false_positive** — BROKE if genuine human writing was labeled AI (FP02–FP07). FP01 and FP08 came back unsure, so they held.
-- **prompt_injection** — judged on what the injection asked for. PI02 BROKE: it asked for a human label and got one, but only because the extra line changed the style score — nothing in the service reads instructions. PI05 held: the audit entry was written intact and nothing was forged.
-- **malformed** — held if rejected cleanly or answered defensibly. MF03–MF07 BROKE: a confident label (emoji-only text at 0.9985 AI, a right-to-left script at 0.92) on input with nothing to score or that the detector can't judge fairly. RQ06 BROKE: a dict `creator_id` is written to the audit log as a dict. RQ11 first returned 429 from the per-IP limiter before reaching the route; the rerun returned a clean 400.
-- **flood_same_creator** — all 12 held: 6 accepted, then 429 from the 7th, matching the 6-per-minute limit.
+- **evasion**, the unmodified AI text scores 0.663 and is labeled AI. BROKE if the text stopped being labeled AI. Only EV10 held (repeating the stanzas pushed it up to 0.871). EV04, EV07 and EV09 broke by only 0.02–0.03, because the baseline sits 0.013 above `AI_THRESHOLD`.
+- **false_positive**, BROKE if genuine human writing was labeled AI (FP02–FP07). FP01 and FP08 came back unsure, so they held.
+- **prompt_injection**, judged on what the injection asked for. PI02 BROKE: it asked for a human label and got one, but only because the extra line changed the style score, nothing in the service reads instructions. PI05 held: the audit entry was written intact and nothing was forged.
+- **malformed**, held if rejected cleanly or answered defensibly. MF03–MF07 BROKE: a confident label (emoji-only text at 0.9985 AI, a right-to-left script at 0.92) on input with nothing to score or that the detector can't judge fairly. RQ06 BROKE: a dict `creator_id` is written to the audit log as a dict. RQ11 first returned 429 from the per-IP limiter before reaching the route; the rerun returned a clean 400.
+- **flood_same_creator**, all 12 held: 6 accepted, then 429 from the 7th, matching the 6-per-minute limit.
 
 **Ten audit log entries from the run**
 
@@ -615,7 +615,7 @@ Picked for the failures, not the easy cases: EV01 (typos took AI text to "human"
 ]
 ```
 
-**The single worst outcome** — the one I'd least want to explain to a writer
+**The single worst outcome**, the one I'd least want to explain to a writer
 whose work got caught by it:
 
 FP03, a non-native English speaker writing carefully about their first month in a new country, was labeled **AI** (combined 0.727; model signal 0.805, style signal 0.650). Both signals read the same thing: short, plain sentences in common words are what the language model predicts easily, and even sentence lengths are what the style signal reads as machine-like. A careful second-language writer is exactly who that describes, so the service accuses the writer it should be most careful with. Both signals agree here, so the disagreement rule in `scoring.py::combine_signals` never fires to pull the score back toward human.
@@ -636,7 +636,7 @@ submission returned), so it was run with `python appeal_check.py`.
 | --------- | ------ | ----- | ----- | ----- | ------- |
 | 1. False positives | at most 1 of 10 of my own paragraphs labeled AI, in every trial | 0 of 10 AI (1 human, 9 unsure) | 0 of 10 AI (1 human, 9 unsure) | 0 of 10 AI (1 human, 9 unsure) | **MET** |
 | 2. Score spread | clearly-AI and clearly-human texts at least 0.4 apart on `combined_score`, every trial | 0.7364 − 0.3165 = 0.420 | 0.420 | 0.420 | **MET** |
-| 3. Label coverage | each of human / unsure / AI produced by at least one of 4 calibration inputs in at least 2 of 3 trials | ai, human, unsure, unsure — all 3 labels | all 3 labels | all 3 labels | **MET** |
+| 3. Label coverage | each of human / unsure / AI produced by at least one of 4 calibration inputs in at least 2 of 3 trials | ai, human, unsure, unsure, all 3 labels | all 3 labels | all 3 labels | **MET** |
 | 4. Appeal path | 10 of 10 appeals set `under_review` and sit beside the original entry | 10 of 10 | 10 of 10 | 10 of 10 | **MET** |
 | 5. Bad input | missing, empty and 50,000-word `text` each return a 4xx, no 5xx, every trial | missing 400, empty 400, 50,000 words **200 (labeled AI, 0.9988)** | same | same | **MISSED** |
 
@@ -646,7 +646,7 @@ recording what `app.py::submit` returned; criterion 2 is the audit entry that
 `audit.py::log_decision` wrote; criterion 4 is `app.py::appeal` and
 `audit.py::log_appeal`.
 
-**Criterion 1 — false positives.** Ten of my own paragraphs, one result per
+**Criterion 1: false positives.** Ten of my own paragraphs, one result per
 line, returned by `app.py::submit` and recorded by `run_eval.py::main`
 (`sent` is the first 70 characters of what was submitted). None is `ai`:
 
@@ -663,7 +663,7 @@ line, returned by `app.py::submit` and recorded by `run_eval.py::main`
 {"status": 200, "guess": "unsure", "confidence": 0.0267, "model_score": 0.7852, "style_score": 0.5068, "label": "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation.", "sent": "Guitar belongs to string family instruments. They are usually made fro"}
 ```
 
-**Criterion 2 — score spread.** The clearly-AI and clearly-human calibration
+**Criterion 2: score spread.** The clearly-AI and clearly-human calibration
 texts as logged by `audit.py::log_decision` (read back from `logs/audit.jsonl`,
 because `app.py::submit` does not return `combined_score`).
 0.7364 − 0.3165 = 0.4199:
@@ -673,7 +673,7 @@ because `app.py::submit` does not return `combined_score`).
 {"timestamp": "2026-11-05T01:37:45+00:00", "content_id": "9d8bad44-c682-4a82-a7b5-4bf7f6abcc99", "creator_id": "eval_score spread_2", "guess": "human", "model_score": 0.1897, "style_score": 0.4433, "combined_score": 0.3165, "label": "We think this was probably written by a person.", "status": "decided"}
 ```
 
-**Criterion 3 — label coverage.** Four calibration inputs through
+**Criterion 3: label coverage.** Four calibration inputs through
 `app.py::submit`, recorded by `run_eval.py::main`. All three labels appear
 (`ai`, `human`, `unsure`):
 
@@ -684,7 +684,7 @@ because `app.py::submit` does not return `combined_score`).
 {"status": 200, "guess": "unsure", "confidence": 0.9527, "model_score": 0.4588, "style_score": 0.5554, "label": "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation.", "sent": "Artificial intelligence is changing how organizations operate. By usin"}
 ```
 
-**Criterion 4 — the appeal path.** A fresh submission and appeal against its
+**Criterion 4: the appeal path.** A fresh submission and appeal against its
 `content_id`, using `app.py::submit` and `app.py::appeal`. The responses:
 
 ```json
@@ -706,7 +706,7 @@ because `app.py::submit` does not return `combined_score`).
 }
 ```
 
-and the two entries now in the log for that `content_id` — the original
+and the two entries now in the log for that `content_id`, the original
 decision written by `audit.py::log_decision` and the appeal written by
 `audit.py::log_appeal`, as separate lines, original untouched:
 
@@ -715,7 +715,7 @@ decision written by `audit.py::log_decision` and the appeal written by
 {"content_id": "1010253e-9c11-4f6c-9744-9621983e3f32", "creator_id": "appeal_demo", "event": "appeal", "reasoning": "I wrote this myself.", "status": "under_review", "timestamp": "2026-11-05T01:50:20+00:00"}
 ```
 
-**Criterion 5 — bad input.** What `run_eval.py::main` recorded
+**Criterion 5: bad input.** What `run_eval.py::main` recorded
 from `app.py::submit` (status 400, 400, then **200**):
 
 ```json
@@ -836,7 +836,7 @@ target I passed too easily is a different thing from a broken one.
 ## The Improvement
 
 **What I changed:** I validated the input in the route, before either signal
-sees the text — no weights or thresholds moved. `app.py::check_text` (new) and
+sees the text, no weights or thresholds moved. `app.py::check_text` (new) and
 the checks in `app.py::submit` now reject, and log through `audit.log_rejection`:
 
 - text over `config.MAX_TEXT_CHARS` = 20,000 characters (about 3,500 words) → **413** `text_too_long`. The detector only reads 400 tokens, roughly 1,600 characters, so nothing past 20,000 changes the score.
@@ -850,12 +850,12 @@ MF04, MF05, MF06, RQ06) all came from `app.py::submit` checking the shape of
 the request but not its content or size. I chose this over reweighting or
 moving a threshold because it is the only change that fixes a failure without
 buying it back somewhere else: cutting signal one's weight from 0.5 to 0.3 (and
-raising signal two's to 0.7) leaves all six of FP02–FP07 above 0.65 — the
-lowest is 0.672 — because signal two agrees with signal one on those, and moving
+raising signal two's to 0.7) leaves all six of FP02–FP07 above 0.65, the
+lowest is 0.672, because signal two agrees with signal one on those, and moving
 `AI_THRESHOLD` above 0.76 to clear them would also push the clearly-AI
 calibration text (0.7364) out of the AI band, breaking criterion 3's AI label.
 
-### Attack Run — After
+### Attack Run - After
 
 `python run_attacks.py --set attack_set --label after`
 (`results/attack_run_2026-11-04_1804_after.md`). Every attack that still
@@ -937,7 +937,7 @@ alone after the window it returned 400 both before (`results/attack_run_2026-11-
 and after (`results/attack_run_2026-11-04_1802.md`), so it is HELD in both.
 
 **Six audit entries for the inputs that changed**, written by
-`audit.py::log_rejection` — a rejection carries no scores, and these inputs
+`audit.py::log_rejection`, a rejection carries no scores, and these inputs
 used to get a verdict:
 
 ```json
@@ -954,11 +954,11 @@ used to get a verdict:
 
 | Criterion | Before | After |
 | --------- | ------ | ----- |
-| 1. False positives | 0 of 10 AI, every trial — MET | 0 of 10 AI, every trial — **MET** |
-| 2. Score spread | 0.4199 every trial — MET | 0.4199 every trial — **MET** |
-| 3. Label coverage | all three labels, every trial — MET | all three labels, every trial — **MET** |
-| 4. Appeal path | 10 of 10, every trial — MET | 10 of 10, every trial — **MET** |
-| 5. Bad input | missing 400, empty 400, 50,000 words **200** — MISSED | missing 400, empty 400, 50,000 words **413**, in every trial — **MET** |
+| 1. False positives | 0 of 10 AI, every trial, MET | 0 of 10 AI, every trial, **MET** |
+| 2. Score spread | 0.4199 every trial, MET | 0.4199 every trial, **MET** |
+| 3. Label coverage | all three labels, every trial, MET | all three labels, every trial, **MET** |
+| 4. Appeal path | 10 of 10, every trial, MET | 10 of 10, every trial, **MET** |
+| 5. Bad input | missing 400, empty 400, 50,000 words **200**, MISSED | missing 400, empty 400, 50,000 words **413**, in every trial, **MET** |
 
 **Did it help, and how do I know:** partly, and not on the problem that
 matters most. It fixed the one missed criterion and 5 of 22 broken attacks, but
@@ -1011,8 +1011,8 @@ written about (see the Diagnoses section above), criterion 2 holds by
 
 | Attacks | Cause (stage) | What I'd do | Why I didn't |
 | ------- | ------------- | ----------- | ------------ |
-| FP02, FP03, FP04, FP05, FP06, FP07 — human writing accused (0.711–0.757) | signal one and signal two agree that plain, formal or repetitive text is AI | Raise `AI_THRESHOLD` from 0.65 to about 0.76, which sits just above the highest of the six (0.757). The alternative, a perplexity midpoint tuned for plain English (`detector.py`, currently 45), needs calibration data I don't have. | Moving the threshold clears all six, but pushes my clearly-AI calibration text (0.7364) into "unsure", so criterion 3's AI label would depend on EV10-style text (0.871). It trades the accusation I care about most for missed AI, which I judged the right trade but did not make without checking it against more AI samples. Reweighting does not work: at 0.3 / 0.7 all six stay above 0.65. |
-| EV03, EV04, EV07, EV09 — AI text called "unsure" by 0.01–0.05 | label mapping: the unmodified AI text only reaches 0.663 against an `AI_THRESHOLD` of 0.65 | Lower `AI_THRESHOLD` to about 0.60, which catches all four (0.604, 0.631, 0.624, 0.633). | It also moves FP01 (human writing, 0.614) from unsure to AI, so seven of the eight human texts would be accused instead of six. That is the trade the other direction, and it contradicts the first row. These two rows cannot both be fixed by the threshold; the real problem is that neither signal gives AI text a high score. |
+| FP02, FP03, FP04, FP05, FP06, FP07, human writing accused (0.711–0.757) | signal one and signal two agree that plain, formal or repetitive text is AI | Raise `AI_THRESHOLD` from 0.65 to about 0.76, which sits just above the highest of the six (0.757). The alternative, a perplexity midpoint tuned for plain English (`detector.py`, currently 45), needs calibration data I don't have. | Moving the threshold clears all six, but pushes my clearly-AI calibration text (0.7364) into "unsure", so criterion 3's AI label would depend on EV10-style text (0.871). It trades the accusation I care about most for missed AI, which I judged the right trade but did not make without checking it against more AI samples. Reweighting does not work: at 0.3 / 0.7 all six stay above 0.65. |
+| EV03, EV04, EV07, EV09, AI text called "unsure" by 0.01–0.05 | label mapping: the unmodified AI text only reaches 0.663 against an `AI_THRESHOLD` of 0.65 | Lower `AI_THRESHOLD` to about 0.60, which catches all four (0.604, 0.631, 0.624, 0.633). | It also moves FP01 (human writing, 0.614) from unsure to AI, so seven of the eight human texts would be accused instead of six. That is the trade the other direction, and it contradicts the first row. These two rows cannot both be fixed by the threshold; the real problem is that neither signal gives AI text a high score. |
 | EV01 (typos → human), PI02 (fake system line → human) | signal one reads odd text as unpredictable, and the combining rule's disagreement pull then halves the distance to the human reading | Cap the pull, or score perplexity on a robust statistic (the median per-sentence value) so one strange line cannot dominate. | The pull is a deliberate choice documented in `scoring.py::combine_signals` (a wrong accusation costs more than a miss), so removing it moves the service toward accusing more people. I'd want to test a cap against the human texts before touching it. |
 | EV02, EV06 (broken-up sentences, one long and one short) | signal two: sentence-length spread is easy to inflate | Replace spread with a measure that is harder to game, or accept it. | Signal two has three simple measures and no better one yet; this is the cheapest attack on it and any fix is a new signal, not a tweak. |
 | EV05 (heavy human edit) | both signals, correctly | Nothing. | A real rewrite of AI text is partly human writing, and "unsure" is a defensible answer. I would not call this a bug. |
@@ -1026,7 +1026,7 @@ of the flood and malformed rows except the five fixed.
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
-     SUBMISSION CHECKLIST — unit 7
+     SUBMISSION CHECKLIST, unit 7
 
        [ ] criteria.md has five numbered criteria, each naming a target
        [ ] Each has a reason underneath
@@ -1038,9 +1038,9 @@ of the flood and malformed rows except the five fixed.
        [ ] Signals and Scoring names scoring.py::combine_signals
        [ ] Sample Run: a submission AND an appeal, as pasted text
        [ ] At least four new commits
-       [ ] Repository URL submitted — WRITE IT DOWN
+       [ ] Repository URL submitted, WRITE IT DOWN
 
-     SUBMISSION CHECKLIST — unit 8
+     SUBMISSION CHECKLIST, unit 8
 
        [ ] Rate limiting on /submit, with your numbers justified
        [ ] The pasted run of status codes showing 429
@@ -1048,8 +1048,8 @@ of the flood and malformed rows except the five fixed.
        [ ] The attack set run IN FULL, every input with an outcome
        [ ] Ten audit log entries pasted as text
        [ ] Five criteria across three trials
-       [ ] A diagnosis for every miss and every broken attack — stage AND mechanism
-       [ ] One improvement, with Attack Run — After
+       [ ] A diagnosis for every miss and every broken attack, stage AND mechanism
+       [ ] One improvement, with Attack Run, After
        [ ] What's Still Broken, including the production trade
        [ ] At least four new commits
        [ ] The SAME repository URL as last unit

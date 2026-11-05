@@ -89,13 +89,13 @@ them breaks all downstream diagnostics, not just the README.
   "common words, short ordinary sentences" regardless of actual authorship —
   this is a load-bearing fact for how unit 8's `false_positive` attack family
   and `criteria.md` are framed, not an implementation bug.
-- **`stylometry.py`** (signal two, stub) — three measures
+- **`stylometry.py`** (signal two, built) — three measures
   (`sentence_length_spread`, `type_token_ratio`, `punctuation_density`)
   combined by `style_signal`. It's pure text-shape analysis with no semantic
   understanding — cheap to fool with typos/sentence-splitting/pasted quotes
   by design. Both signals must point the same direction (higher = more
   likely AI) since `scoring.combine_signals` treats them identically.
-- **`scoring.py`** (stub) — `combine_signals` is the single named
+- **`scoring.py`** (built) — `combine_signals` is the single named
   combining-rule function (the README explicitly must cite
   `scoring.py::combine_signals`, and tooling/grading checks that claim
   against this file). `score_to_label` maps score → `(guess, label_text)`;
