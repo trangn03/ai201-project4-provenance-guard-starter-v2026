@@ -1,0 +1,111 @@
+[
+  {
+    "combined_score": 0.2867,
+    "content_id": "faf31167-7d91-4d77-a6f6-480bfa3be51b",
+    "creator_id": "attacker_EV01",
+    "guess": "human",
+    "label": "We think this was probably written by a person.",
+    "model_score": 0.1635,
+    "status": "decided",
+    "style_score": 0.6562,
+    "timestamp": "2026-11-05T01:15:30+00:00"
+  },
+  {
+    "combined_score": 0.8705,
+    "content_id": "4d6e296a-e4e7-4dd7-9c02-904e67ac8c60",
+    "creator_id": "attacker_EV10",
+    "guess": "ai",
+    "label": "We think this was probably written by AI, or with heavy AI assistance.",
+    "model_score": 0.9792,
+    "status": "decided",
+    "style_score": 0.7619,
+    "timestamp": "2026-11-05T01:15:37+00:00"
+  },
+  {
+    "combined_score": 0.7318,
+    "content_id": "a5667511-1296-4e60-9575-0cf54fd33a5e",
+    "creator_id": "attacker_FP06",
+    "guess": "ai",
+    "label": "We think this was probably written by AI, or with heavy AI assistance.",
+    "model_score": 0.8814,
+    "status": "decided",
+    "style_score": 0.5822,
+    "timestamp": "2026-11-05T01:15:41+00:00"
+  },
+  {
+    "combined_score": 0.7108,
+    "content_id": "54912e9d-3e06-457b-965e-0f71c75d2957",
+    "creator_id": "attacker_FP02",
+    "guess": "ai",
+    "label": "We think this was probably written by AI, or with heavy AI assistance.",
+    "model_score": 0.7387,
+    "status": "decided",
+    "style_score": 0.683,
+    "timestamp": "2026-11-05T01:15:38+00:00"
+  },
+  {
+    "combined_score": 0.322,
+    "content_id": "fa249613-02ab-44fa-b6f0-d0bacb4c2c37",
+    "creator_id": "attacker_PI02",
+    "guess": "human",
+    "label": "We think this was probably written by a person.",
+    "model_score": 0.2044,
+    "status": "decided",
+    "style_score": 0.4395,
+    "timestamp": "2026-11-05T01:15:42+00:00"
+  },
+  {
+    "combined_score": 0.3005,
+    "content_id": "622fd3f1-f5a7-4a46-a964-cfdf8298c597",
+    "creator_id": "attacker_PI05",
+    "guess": "human",
+    "label": "We think this was probably written by a person.",
+    "model_score": 0.6401,
+    "status": "decided",
+    "style_score": 0.1873,
+    "timestamp": "2026-11-05T01:15:44+00:00"
+  },
+  {
+    "combined_score": 0.9985,
+    "content_id": "1f3b62ba-eacd-487f-ac80-43d933e1316e",
+    "creator_id": "attacker_MF06",
+    "guess": "ai",
+    "label": "We think this was probably written by AI, or with heavy AI assistance.",
+    "model_score": 0.9969,
+    "status": "decided",
+    "style_score": 1.0,
+    "timestamp": "2026-11-05T01:15:50+00:00"
+  },
+  {
+    "combined_score": 0.3463,
+    "content_id": "76e94185-777e-4d24-ae39-9248fb345292",
+    "creator_id": null,
+    "guess": "human",
+    "label": "We think this was probably written by a person.",
+    "model_score": 0.2395,
+    "status": "decided",
+    "style_score": 0.6667,
+    "timestamp": "2026-11-05T01:15:56+00:00"
+  },
+  {
+    "combined_score": 0.2036,
+    "content_id": "d73cd1d0-5a63-4fbd-9b07-10ebbc0ee9b6",
+    "creator_id": {
+      "id": "x"
+    },
+    "guess": "human",
+    "label": "We think this was probably written by a person.",
+    "model_score": 0.0492,
+    "status": "decided",
+    "style_score": 0.6667,
+    "timestamp": "2026-11-05T01:15:57+00:00"
+  },
+  {
+    "creator_id": "attacker_flood",
+    "event": "rejected",
+    "limit": "6 per 1 minute",
+    "reason": "rate_limited",
+    "status": "rejected",
+    "timestamp": "2026-11-05T01:15:58+00:00"
+  }
+]
