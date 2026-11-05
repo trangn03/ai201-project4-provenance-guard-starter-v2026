@@ -306,6 +306,79 @@ $ curl "http://127.0.0.1:5000/log?limit=2"
   original phrasing only described the mechanism, not the reasoning behind
   it.
 
+**Moment 3 — held or broke for 56 attacks**
+
+- *What I asked for:* a verdict, HELD or BROKE, for every attack in the set,
+  judged against what the `targets` column said each one was going for, and a
+  count.
+- *What came back:* 22 BROKE and 34 HELD, with the rule written down per
+  family (an evasion BROKE if the text stopped being labeled AI, measured
+  against the unmodified AI text's 0.6628; a false positive BROKE if human
+  writing was labeled AI; malformed input held if it was rejected cleanly or
+  answered defensibly). It flagged its own weak calls: EV04, EV07 and EV09
+  broke by only 0.02–0.03 because the baseline sits 0.013 over the AI
+  threshold, and MF03–MF07 only count as broken if a service should refuse
+  input with nothing to read.
+- *What I changed:* I did not accept RQ11's first 429 as a result. The
+  instructor's note says a malformed row with no usable `creator_id` counts
+  against the IP, so that request never reached the route. I had it rerun
+  alone after the rate window; it returned a clean 400, so RQ11 is HELD. I
+  also had the AI check each verdict against the audit log's scores rather
+  than the report's Score column, which is confidence, not the combined score.
+
+**Moment 4 — scenarios, and the one thing the AI wouldn't write for me**
+
+- *What I asked for:* `scenarios.py` for my five criteria, including the
+  criterion that needs my own writing and the one that needs inputs across the
+  score range.
+- *What came back:* calibration texts it had scored offline against my
+  scoring code before choosing them. Its first "clearly human" text, a polished
+  family-trip anecdote, only reached "unsure" (0.476); a casual lowercase one
+  reached "human" (0.317), which is how it found that the human label is hard
+  to reach. For criterion 1 it left ten placeholders and told me it could not
+  supply my writing, because the criterion is about whether the service
+  accuses real people.
+- *What I changed:* I gave it two of my own course assignments. It used ten
+  paragraphs in my wording, typos included, and left out the ones that read as
+  encyclopedia definitions and the one that names me and my school, since the repo gets pushed. I also recorded that my own formal prose is an easier test than the
+  plain writing criterion 1 was written about, which is why I would tighten
+  that criterion.
+
+**Moment 5 — two mistakes the AI made, and how they were caught**
+
+- *What I asked for:* the "after" attack run, and the "What's Still Broken"
+  section.
+- *What came back wrong:* (1) a rerun of one attack in the same minute as the
+  full run overwrote the full report, because the filename only has the
+  minute in it; and a second `run_attacks.py` at the same time shared the rate
+  limiter, so some rows came back 429. (2) The script that wrote the README
+  section looked for its end marker from the start of the file, matched an
+  earlier comment, and pasted 919 duplicated lines in. It had already
+  committed that.
+- *What I changed:* the diffstat read "919 insertions" where about 30 were
+  expected, so it was caught before pushing. The README was restored from the
+  last good commit, the script was fixed to search from the section heading, and
+  the unpushed commit was amended. For the reports, I used the labeled `_after`
+  run, confirmed it matched the before run on every row that was not rejected,
+  and deleted two redundant reports of my own.
+
+**Moment 6 — choosing the improvement, and what it did not fix**
+
+- *What I asked for:* one improvement from reweighting, moving a threshold, or
+  validating input.
+- *What came back:* input validation, with the arithmetic for why not the
+  others: cutting signal one's weight from 0.5 to 0.3 leaves all of FP02–FP07
+  above 0.65 (lowest 0.672), and raising `AI_THRESHOLD` past 0.76 would clear
+  them but push my clearly-AI calibration text (0.7364) out of the AI band.
+  After the change it reported 22 broken attacks down to 17, criterion 5 from
+  MISSED to MET, and said outright that it did nothing for the six human texts
+  still called AI.
+- *What I changed:* I kept that last sentence in the README as the verdict
+  instead of leading with 22 → 17, since none of the five attacks it fixed
+  involved a real writer being accused. I also checked the claim myself by
+  diffing the two attack reports: 50 of 56 rows are identical, and the six that
+  changed are exactly the rejected inputs.
+
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
 ---

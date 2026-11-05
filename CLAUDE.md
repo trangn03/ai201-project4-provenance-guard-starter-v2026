@@ -11,11 +11,12 @@ them into one score, and maps that score to a label a reader sees. Unit 8
 adds rate limiting and an attack set designed to exploit each signal's known
 blind spot.
 
-Most of the codebase is a deliberately incomplete starter: the TODOs in
-`app.py`, `stylometry.py`, and `scoring.py` are student-facing assignment
-work, not bugs. Don't "complete" them speculatively — follow whatever the
-user is actually asking for, and preserve the milestone-by-milestone build
-order described in their docstrings if adding to them.
+The starter's student-facing TODOs (`/submit` and `/appeal` in `app.py`,
+`stylometry.py`, `scoring.py`, `scenarios.py`) have been built out; the
+docstrings still describe the milestone-by-milestone order they were built in.
+Remaining unit 8 work is the README write-up and whatever the user asks for —
+don't change thresholds, weights, signals or criteria on your own initiative,
+because the README has to justify each one.
 
 ## Commands
 
@@ -39,7 +40,14 @@ python run_attacks.py --set path/to/attack_set --id EV03 --show   # print only, 
 python run_attacks.py --set path/to/attack_set --one-per-family --show
 python run_attacks.py --flood 15                             # rate-limit check
 python run_eval.py --label before                            # run scenarios.py, 3 trials each
+python appeal_check.py                                       # criterion 4: 10 submit+appeal pairs x 3 trials
 ```
+
+Pass `--label before` / `--label after` to `run_attacks.py` as well as
+`run_eval.py`. Report filenames carry only the minute
+(`attack_run_<date>_<HHMM>[_label].md`), so two runs started in the same minute
+overwrite each other, and two runs at once share one rate limiter and return
+spurious 429s — run them one at a time.
 
 There is no lint config and no formal test suite beyond `test.py` (an
 environment/smoke check, not unit tests — it asserts `/ping` answers via
@@ -54,8 +62,12 @@ new CLI entry points.
 
 ## Architecture
 
-Request flow through `/submit` (once built): `app.py` pulls `text` /
-`creator_id` from the JSON body → `detector.model_signal(text)` (signal one)
+Request flow through `/submit`: `app.py` pulls `text` /
+`creator_id` from the JSON body → input checks (a non-dict body, a
+non-string `creator_id`, empty/non-string `text`, and `check_text`: over
+`MAX_TEXT_CHARS` → 413, control characters, fewer than `MIN_WORDS` words with a
+letter; each rejection goes through `audit.log_rejection` and never reaches a
+signal) → `detector.model_signal(text)` (signal one)
 and `stylometry.style_signal(text)` (signal two) each produce an independent
 0–1 "how AI-like" score → `scoring.combine_signals(model_score, style_score)`
 merges them into one 0–1 score → `scoring.score_to_label(score)` maps that to
