@@ -92,6 +92,23 @@ def score_to_label(score: float) -> tuple[str, str]:
     )
 
 
+def label_without_model(style_score: float) -> tuple[str, str]:
+    """
+    The label when signal one could not run and only the style score exists.
+
+    Same thresholds as `score_to_label`, with one difference: it never returns
+    "ai". Signal two cannot read (typos, broken-up sentences or a pasted quote
+    move it, see the README), so on its own it is not evidence strong enough to
+    tell a writer their work is machine-made, and a wrong accusation costs more
+    than a miss (criteria.md). A score that would have been "ai" becomes
+    "unsure". Every label gets a note that part of the check did not run.
+    """
+    guess, label = score_to_label(style_score)
+    if guess == "ai":
+        guess, label = score_to_label((config.HUMAN_THRESHOLD + config.AI_THRESHOLD) / 2.0)
+    return guess, label + " Only part of our check could run, so this is less certain than usual."
+
+
 def label_ranges() -> list[tuple[str, str]]:
     """
     The score range each label covers. Your README needs these beside the

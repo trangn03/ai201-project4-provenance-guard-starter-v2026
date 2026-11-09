@@ -280,6 +280,7 @@ def submit():
         }), status
 
     content_id = str(uuid.uuid4())
+    degraded_reason = None
     try:
         model_score = detector.model_signal(text)
     except ValueError as exc:
@@ -292,10 +293,22 @@ def submit():
             "error": "invalid_request",
             "message": str(exc),
         }), 400
+    except Exception as exc:  # noqa: BLE001
+        # Signal one failed for a reason that is not the writer's fault: the
+        # model was never downloaded, it ran out of memory, a load failed. The
+        # request carries on with the style signal alone, and the failure is
+        # logged below. The reason is one line so the audit entry stays one line.
+        model_score = None
+        degraded_reason = " ".join(f"{type(exc).__name__}: {exc}".split())[:300]
+        app.logger.error("model signal failed, answering from style only: %s", degraded_reason)
 
     style_score = stylometry.style_signal(text)
-    combined_score = scoring.combine_signals(model_score, style_score)
-    guess, label = scoring.score_to_label(combined_score)
+    if model_score is None:
+        combined_score = style_score
+        guess, label = scoring.label_without_model(style_score)
+    else:
+        combined_score = scoring.combine_signals(model_score, style_score)
+        guess, label = scoring.score_to_label(combined_score)
 
     # How far into this label's territory the score falls, not the raw score
     # itself — 1.0 means as deep into "ai"/"human" as the scale allows, or (for
@@ -310,6 +323,12 @@ def submit():
         confidence = 1.0 - abs(combined_score - band_midpoint) / band_half_width
     confidence = round(min(max(confidence, 0.0), 1.0), 4)
 
+    degraded = degraded_reason is not None
+    if degraded:
+        confidence = round(confidence * config.DEGRADED_CONFIDENCE_FACTOR, 4)
+
+    # Normal entries stay exactly as they were; only degraded ones carry extras.
+    extra = {"degraded": True, "degraded_reason": degraded_reason} if degraded else {}
     audit.log_decision(
         content_id=content_id,
         creator_id=creator_id,
@@ -318,6 +337,7 @@ def submit():
         style_score=style_score,
         combined_score=combined_score,
         label=label,
+        **extra,
     )
 
     return jsonify({
@@ -327,6 +347,7 @@ def submit():
         "label": label,
         "model_score": model_score,
         "style_score": style_score,
+        "degraded": degraded,
     })
 
 

@@ -88,8 +88,8 @@ position.**
 | `POST /ping` | **works** | The example. Don't edit it |
 | `GET /health` | **works** | Is the service up, is the model loaded |
 | `GET /log` | **works** | The audit log, as JSON |
-| `POST /submit` | **you build it** | Milestones 3, 4, 5 |
-| `POST /appeal` | **you build it** | Milestone 5 |
+| `POST /submit` | **works** | Scores text with both signals. Falls back to the style signal alone if the model fails (see Degraded mode below) |
+| `POST /appeal` | **works** | Moves a decision to `under_review` and logs the appeal |
 
 ---
 
@@ -182,6 +182,84 @@ still off. `GET /health` reports which.
 Rejections are logged for you. **An attack that shows up only as an absence is
 one you'll never find** — a thousand requests that got a `429` and left no
 trace look exactly like a quiet afternoon.
+
+---
+
+## Degraded mode: when the model can't run (the extension)
+
+If signal one (the local gpt2 model) fails, `/submit` no longer returns a 500.
+It answers from the style signal alone and says so:
+
+| What you see | Normal | Degraded |
+|---|---|---|
+| Response `degraded` | `false` | `true` |
+| Response `model_score` | a number | `null` |
+| `guess` | `human`, `unsure` or `ai` | `human` or `unsure` only. It never says `ai` on one signal |
+| `confidence` | as computed | halved (`config.DEGRADED_CONFIDENCE_FACTOR`) |
+| Audit log entry | the nine fields | the nine fields plus `degraded: true` and `degraded_reason` |
+
+The failures it covers are the ones that raise an error: a model that was never
+downloaded, an out-of-memory error, a load that fails. A call that hangs is not
+covered.
+
+### See it happen
+
+The simplest real failure is to point the service at a model that doesn't
+exist. Stop any server already running first (`Address already in use` means
+one is), then start it broken.
+
+PowerShell:
+
+```powershell
+$env:AI201_DETECTOR_MODEL = "does-not-exist-xyz"
+python app.py
+```
+
+Git Bash:
+
+```bash
+AI201_DETECTOR_MODEL=does-not-exist-xyz python app.py
+```
+
+In a second terminal, submit anything:
+
+```powershell
+curl.exe -X POST http://127.0.0.1:5000/submit -H "Content-Type: application/json" -d '{\"text\": \"We missed the last train, so we walked home along the canal.\", \"creator_id\": \"me\"}'
+```
+
+You should get `"degraded": true`, `"model_score": null` and a `guess` of
+`human` or `unsure`. `GET /health` shows `detector_model` as the broken name
+and `detector_loaded` as `false`.
+
+### Check it
+
+With the broken service running:
+
+```bash
+python degraded_check.py --expect degraded
+```
+
+It sends ten texts across three trials and checks the response and the audit
+entry for each. Expect `10/10 behaved as 'degraded'` three times and exit
+code 0. Then stop the server, **clear the variable**, start it normally and
+confirm the normal path is unchanged:
+
+```powershell
+Remove-Item Env:AI201_DETECTOR_MODEL
+python app.py
+```
+
+```bash
+python degraded_check.py --expect normal
+```
+
+If you skip clearing the variable, the "normal" server is still broken and the
+check fails on `degraded is not false`.
+
+Run these one at a time and not alongside `run_attacks.py`: they share one rate
+limiter, though each check submission uses its own `creator_id`. Both checks
+write to `logs/audit.jsonl`, and those entries are meant to be committed as the
+run record.
 
 ---
 

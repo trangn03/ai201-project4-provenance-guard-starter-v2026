@@ -108,6 +108,15 @@ AI_THRESHOLD = 0.65
 # prints the bands; the reachable range is a different question.
 
 
+# ─── Degraded mode (Shape B: harden against failure) ─────────────────────────
+# When signal one (the local model) cannot run, /submit still answers from the
+# style signal alone instead of returning a 500. One signal is weaker evidence,
+# so the answer carries less confidence: the normal confidence is multiplied by
+# this factor. The label side of the same decision lives in
+# scoring.py::label_without_model, which never returns the "ai" label.
+DEGRADED_CONFIDENCE_FACTOR = 0.5
+
+
 # ─── Rate limiting (UNIT 8) ──────────────────────────────────────────────────
 # Off in unit 7. You turn it on and choose the numbers in unit 8, Milestone 1.
 #
