@@ -154,6 +154,131 @@ record would be invisible, which is the same absence `audit.py` warns about.
 
 ---
 
+## Unit 9 criteria: the extension
+
+Five more, numbered 9.1 to 9.5 so they cannot be confused with 1 to 7 above,
+which the eval tooling and the earlier write-up refer to by number. The
+extension is degraded mode, failure handling and the structured run log
+(`runlog.py`, `logs/runs.jsonl`). Criteria 9.1, 9.2 and 9.3 are about that. 9.4
+and 9.5 are about the system underneath, and are here because the new
+instrumentation exposed a number that was easy not to look at.
+
+These were written to be missable. Two of them were already known to fail on this
+machine when written, and say so. A criterion that cannot fail teaches nothing.
+
+---
+
+## 9.1 No failure goes unrecorded
+
+Nine kinds of failing request are each sent to `/submit`: empty text, text too
+short, a control character, `text` missing, a body that is not a JSON object,
+text over `MAX_TEXT_CHARS`, a rate-limited request, a model that cannot load,
+and a crash inside the route. Each one produces **exactly one** record in
+`logs/runs.jsonl` with a non-empty reason (`output.message`, `degraded_reason`
+or `exception.message`): 9 of 9, not 8.
+
+**Why this target:** a failure that shows up only as an absence is one nobody
+finds. The kind most likely to be missing is the crash. Flask skips
+`after_request` for an unhandled error in debug mode, which is the mode this
+service runs in by default, so a record written there would silently never
+appear. The record is written in `teardown_request` for that reason, and this
+criterion is what checks that the choice worked. 9 of 9 because a log that is
+complete for eight kinds of failure and blind to the ninth cannot be relied on
+for any of them.
+
+*Checked by:* `tests/test_runlog.py` covers eight of the nine today. The
+oversize case (a 413) has no test yet, so as written this is **not yet shown to
+be met**.
+
+---
+
+## 9.2 A degraded answer is quick
+
+With the model unable to load, across 3 trials of 10 requests
+(`python tools/degraded_check.py --expect degraded`), the median wall time
+recorded in `duration_ms` is at most 1 second and the slowest request at most 3
+seconds.
+
+**Why this target:** a service that is hurt should not also be slower. Degraded
+mode does less work than a normal run: it skips the model and the long part of
+the request. But `detector._load()` caches nothing when a load fails, so every
+request retries it, and if that retry reaches the network each degraded answer
+could wait on a failed lookup. A writer would then wait longest exactly when
+something is broken. Fast failure is the point of falling back instead of
+raising. The bound is deliberately well under a normal warm run (the
+measurement below puts that median at about 2.6 seconds) because the fallback
+has to be clearly better than waiting for the model, not merely equal to it.
+
+---
+
+## 9.3 The two logs agree
+
+Forty requests, a mix of valid and invalid text, are sent to the live service
+from 8 clients at once. Afterwards `logs/runs.jsonl` holds **exactly 40**
+records for them, every line is valid JSON, and for each request that became a
+decision the run record and the audit entry agree on `content_id`, `guess`,
+`model_score` and `style_score`, 40 of 40 where applicable.
+
+**Why this target:** the run log and the audit log are written separately, one
+in the route and one after it, so they can drift. A crash between the two would
+leave one without the other. A log that disagrees with the audit log is worse
+than no log, because it looks like evidence. Concurrency is the other
+risk: both are append-only files written by a threaded server, and interleaved
+writes are the usual way a JSON-lines file ends up with a corrupt line. "Exactly
+40" rather than "about 40" because a lost record is the very failure 9.1 is about.
+
+*Checked by:* nothing yet. This needs a small script that sends the 40 requests
+and compares the three counts, so as written it is **not yet shown to be met**.
+
+---
+
+## 9.4 A writer does not wait long
+
+On the warm path, 90% of runs finish in **5 seconds or less** of wall time and
+use **3 seconds or less** of CPU, over at least 30 warm runs of one text
+(`python tools/measure_cost.py`, the spread section of its report).
+
+**Why this target:** the model is local, so the cost of a run is the writer's
+wait. RUNNING.md says warm submissions take "a second or two", and 5 seconds at
+the 90th percentile is 2 to 3 times that, which is generous. A mean would hide
+what matters here, which is the slow runs, so the target is a percentile.
+
+**Known to fail when written.** The 30-run measurement on this machine
+(`results/cost_2026-11-08_1812.md`) gave a median of 2.6 s but a 90th percentile
+of 20.9 s wall and 5.2 s CPU, with the slowest run 35 times the fastest on
+identical input. The slow runs cluster late in each launch, and CPU time for the
+same work also rose from about 1.5 s to 5 to 6 s. This criterion starts out
+**missed**, and the work is finding out whether that is the laptop, the model or
+the service, not moving the number.
+
+---
+
+## 9.5 Plain human writing is not accused
+
+Of the eight human-written texts in the attack set that stand in for people at
+risk of a false accusation (FP01 to FP08), **at most 2** are labelled
+high-confidence AI, in every one of 3 trials.
+
+**Why this target:** this is the failure the whole project is about, and the one
+I have so far chosen not to fix. A wrong accusation costs a writer far more
+than a missed detection costs the site, and the writers this signal is most
+likely to accuse are the ones with the least room to argue back. Criterion 1 is
+met, but only because my own paragraphs are longer and more uneven than the
+plain writing it was written about, and I said so in the README. This criterion
+uses texts I did not pick to pass, so it cannot be met by my choice of examples.
+Two of eight rather than zero because some plain, formal human writing really is
+close to model output and I would rather say that than promise what two weak
+signals cannot do.
+
+**Known to fail when written.** In the 2026-11-08 regression attack run, 6 of
+the 8 (FP02 to FP07) come back as AI; only FP01 and FP08 are held at "unsure".
+It starts out **missed**. The trade I have written down, raising `AI_THRESHOLD`
+toward 0.76, is the change this criterion would be used to judge, and it also
+lets some AI text through as "unsure", which is not counted here and must be
+reported next to it.
+
+---
+
 <!-- ─────────────────────────────────────────────────────────────────────────
      UNIT 8 — read this before you change anything above.
 
