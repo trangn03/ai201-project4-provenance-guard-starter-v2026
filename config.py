@@ -135,6 +135,16 @@ RATE_LIMIT_PER_DAY = 100
 RATE_LIMIT_STORAGE = "memory://"
 
 
+# ─── Run log (structured logging) ────────────────────────────────────────────
+# One JSON line per /submit request, including ones that were rejected, rate
+# limited or crashed. See runlog.py for the fields. It sits in LOG_DIR beside
+# the audit log, and unlike the audit log it keeps part of the submitted text,
+# so this is the setting to turn down if the text should not be stored: how many
+# characters of each input to keep. 0 keeps the length and word count only.
+RUN_LOG_NAME = "runs.jsonl"
+RUN_LOG_INPUT_CHARS = 500
+
+
 # ─── Paths ───────────────────────────────────────────────────────────────────
 
 LOG_DIR = ROOT / "logs"

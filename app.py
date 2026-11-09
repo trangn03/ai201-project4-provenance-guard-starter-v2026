@@ -25,14 +25,69 @@ Routes:
 """
 
 import re
+import time
+import traceback
 import uuid
 
-from flask import Flask, jsonify, request
+from flask import Flask, g, jsonify, request
 
 import audit
 import config
+import runlog
 
 app = Flask(__name__)
+
+
+# ── Structured run log ────────────────────────────────────────────────────────
+# One record per /submit request in logs/runs.jsonl (see runlog.py), whatever
+# happened to it: decided, degraded, rejected, rate limited or crashed.
+#
+# The record is written in teardown_request, not after_request, on purpose.
+# teardown_request runs even when the route raises, and receives the exception;
+# after_request does not run for an unhandled error in debug mode, which is
+# exactly the case that would otherwise leave nothing behind.
+#
+# These hooks are registered before the rate limiter below so the clock starts
+# before the limiter can reject a request.
+
+@app.before_request
+def _begin_run():
+    g.run_t0 = time.perf_counter()
+    g.run_cpu0 = time.process_time()    # CPU seconds the whole process has used so far
+    g.run_extra = {}
+
+
+@app.after_request
+def _note_response(resp):
+    if request.method == "POST" and request.path == "/submit":
+        g.run_status = resp.status_code
+        g.run_body = resp.get_json(silent=True)
+    return resp
+
+
+@app.teardown_request
+def _write_run(exc):
+    if request.method != "POST" or request.path != "/submit":
+        return
+    try:
+        started = g.get("run_t0")
+        duration_ms = None if started is None else (time.perf_counter() - started) * 1000
+        status = g.get("run_status")
+        extra = dict(g.get("run_extra") or {})
+        # Process-wide CPU time, all threads: torch spreads work over cores, so
+        # this can exceed the wall-clock time. It is attributable to one request
+        # only while requests arrive one at a time, which is how it is measured.
+        cpu0 = g.get("run_cpu0")
+        extra["cpu_ms"] = None if cpu0 is None else round((time.process_time() - cpu0) * 1000, 1)
+        trace = None
+        if exc is not None:
+            trace = "".join(traceback.format_exception(exc))
+            status = status or 500
+        runlog.write(runlog.build_record(
+            request.get_json(silent=True), status or 500, g.get("run_body"),
+            extra, duration_ms, exc, trace))
+    except Exception:  # noqa: BLE001 - logging must not break a request
+        app.logger.exception("could not build the run record")
 
 
 # ── Rate limiting — UNIT 8 ────────────────────────────────────────────────────
@@ -281,6 +336,8 @@ def submit():
 
     content_id = str(uuid.uuid4())
     degraded_reason = None
+    g.run_extra["cold_start"] = detector._model is None
+    model_started = time.perf_counter()
     try:
         model_score = detector.model_signal(text)
     except ValueError as exc:
@@ -301,14 +358,22 @@ def submit():
         model_score = None
         degraded_reason = " ".join(f"{type(exc).__name__}: {exc}".split())[:300]
         app.logger.error("model signal failed, answering from style only: %s", degraded_reason)
+    finally:
+        # Runs on every path out of the try, including the 400 return above, so
+        # a failed or rejected model call still gets its time recorded.
+        g.run_extra["model_ms"] = round((time.perf_counter() - model_started) * 1000, 1)
+        g.run_extra["degraded_reason"] = degraded_reason
 
+    style_started = time.perf_counter()
     style_score = stylometry.style_signal(text)
+    g.run_extra["style_ms"] = round((time.perf_counter() - style_started) * 1000, 1)
     if model_score is None:
         combined_score = style_score
         guess, label = scoring.label_without_model(style_score)
     else:
         combined_score = scoring.combine_signals(model_score, style_score)
         guess, label = scoring.score_to_label(combined_score)
+    g.run_extra["combined_score"] = combined_score
 
     # How far into this label's territory the score falls, not the raw score
     # itself — 1.0 means as deep into "ai"/"human" as the scale allows, or (for
