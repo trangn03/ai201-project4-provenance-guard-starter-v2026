@@ -123,6 +123,37 @@ is one that can't be diagnosed.
 
 ---
 
+## 6. A model failure still gets an answer
+
+With the service started with its model unable to load, 10 submissions
+(`python degraded_check.py --expect degraded`) each return a 200 with
+`degraded: true` and `model_score: null`, and none returns a 5xx, in every one
+of 3 trials.
+
+**Why this target:** the model is a ~550 MB local download and the weakest
+point on the bad path. Before this extension, a missing or failed model ended
+every `/submit` in a 500. A writer who submits cannot tell whether the service
+or their text is the problem, so a failure that is not theirs should still get
+an answer. All-or-nothing across the trials, because one 5xx is the failure
+this criterion exists to rule out.
+
+---
+
+## 7. A degraded answer never accuses, and always leaves a trace
+
+In the same degraded runs, none of the 30 submissions is labelled `ai`, and
+every one has exactly one audit log entry with `degraded: true` and a
+`degraded_reason`.
+
+**Why this target:** with only signal two, the shape of the text, the service is
+working from the weaker signal, and the README already shows how cheaply it is
+fooled. A wrong accusation costs a writer more than a missed detection costs
+the site (criterion 1), so one signal never gets to say "ai". The log entry is
+the other half: a failure that returned a clean-looking answer and left no
+record would be invisible, which is the same absence `audit.py` warns about.
+
+---
+
 <!-- ─────────────────────────────────────────────────────────────────────────
      UNIT 8 — read this before you change anything above.
 

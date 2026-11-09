@@ -1,0 +1,627 @@
+# Run log — regression
+
+- Produced by: `run_eval.py::main`
+- Service: `app.py::submit` · scoring: `scoring.py::combine_signals`
+- 3 trials per criterion · 2026-11-08 17:18
+
+Fill in Target from `criteria.md`, and Run and Verdict from the output
+underneath. Whether a trial passed depends on the criterion you wrote.
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. my own writing |  |   |   |   |  |
+| 2. score spread |  |   |   |   |  |
+| 3. label coverage |  |   |   |   |  |
+| 5. bad input |  |   |   |   |  |
+
+---
+
+## What actually came back
+
+Real output. Paste the relevant parts into your README — the rubric
+asks for the actual JSON, not a description of it.
+
+### my own writing
+
+**Trial 1**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.128,
+    "model_score": 0.5532,
+    "style_score": 0.7084,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "I decided to take Music Appreciation online because I am curious about"
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.4394,
+    "model_score": 0.0966,
+    "style_score": 0.495,
+    "label": "We think this was probably written by a person.",
+    "sent": "Baa Baa Black Sheep is written by a Swedish music teacher named Alice "
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.5033,
+    "model_score": 0.4761,
+    "style_score": 0.6728,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "On Monday, I had dinner at my uncle\u2019s house and we got a chance to wat"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.3573,
+    "model_score": 0.5266,
+    "style_score": 0.6662,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "During the Middle Ages, Catholic Church started to make systematic use"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.2473,
+    "model_score": 0.285,
+    "style_score": 0.6933,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "Sacred music is associated with religious or expanded approaches to su"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.9547,
+    "model_score": 0.3509,
+    "style_score": 0.6627,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "Music was a basic piece of city, strict, and dignified life in the Ren"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.4313,
+    "model_score": 0.3213,
+    "style_score": 0.5082,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "Basse danse was a popular court dance that took place in Burgundian Co"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.5713,
+    "model_score": 0.5135,
+    "style_score": 0.6151,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "The lute, harpsichord, and contrabassoon are among the strange and fan"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.198,
+    "model_score": 0.5987,
+    "style_score": 0.6419,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "King George II attended the London premier and allegedly rose to his f"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.0267,
+    "model_score": 0.7852,
+    "style_score": 0.5068,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "Guitar belongs to string family instruments. They are usually made fro"
+  }
+]
+```
+
+**Trial 2**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.128,
+    "model_score": 0.5532,
+    "style_score": 0.7084,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "I decided to take Music Appreciation online because I am curious about"
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.4394,
+    "model_score": 0.0966,
+    "style_score": 0.495,
+    "label": "We think this was probably written by a person.",
+    "sent": "Baa Baa Black Sheep is written by a Swedish music teacher named Alice "
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.5033,
+    "model_score": 0.4761,
+    "style_score": 0.6728,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "On Monday, I had dinner at my uncle\u2019s house and we got a chance to wat"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.3573,
+    "model_score": 0.5266,
+    "style_score": 0.6662,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "During the Middle Ages, Catholic Church started to make systematic use"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.2473,
+    "model_score": 0.285,
+    "style_score": 0.6933,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "Sacred music is associated with religious or expanded approaches to su"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.9547,
+    "model_score": 0.3509,
+    "style_score": 0.6627,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "Music was a basic piece of city, strict, and dignified life in the Ren"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.4313,
+    "model_score": 0.3213,
+    "style_score": 0.5082,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "Basse danse was a popular court dance that took place in Burgundian Co"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.5713,
+    "model_score": 0.5135,
+    "style_score": 0.6151,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "The lute, harpsichord, and contrabassoon are among the strange and fan"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.198,
+    "model_score": 0.5987,
+    "style_score": 0.6419,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "King George II attended the London premier and allegedly rose to his f"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.0267,
+    "model_score": 0.7852,
+    "style_score": 0.5068,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "Guitar belongs to string family instruments. They are usually made fro"
+  }
+]
+```
+
+**Trial 3**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.128,
+    "model_score": 0.5532,
+    "style_score": 0.7084,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "I decided to take Music Appreciation online because I am curious about"
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.4394,
+    "model_score": 0.0966,
+    "style_score": 0.495,
+    "label": "We think this was probably written by a person.",
+    "sent": "Baa Baa Black Sheep is written by a Swedish music teacher named Alice "
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.5033,
+    "model_score": 0.4761,
+    "style_score": 0.6728,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "On Monday, I had dinner at my uncle\u2019s house and we got a chance to wat"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.3573,
+    "model_score": 0.5266,
+    "style_score": 0.6662,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "During the Middle Ages, Catholic Church started to make systematic use"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.2473,
+    "model_score": 0.285,
+    "style_score": 0.6933,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "Sacred music is associated with religious or expanded approaches to su"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.9547,
+    "model_score": 0.3509,
+    "style_score": 0.6627,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "Music was a basic piece of city, strict, and dignified life in the Ren"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.4313,
+    "model_score": 0.3213,
+    "style_score": 0.5082,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "Basse danse was a popular court dance that took place in Burgundian Co"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.5713,
+    "model_score": 0.5135,
+    "style_score": 0.6151,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "The lute, harpsichord, and contrabassoon are among the strange and fan"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.198,
+    "model_score": 0.5987,
+    "style_score": 0.6419,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "King George II attended the London premier and allegedly rose to his f"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.0267,
+    "model_score": 0.7852,
+    "style_score": 0.5068,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "Guitar belongs to string family instruments. They are usually made fro"
+  }
+]
+```
+
+### score spread
+
+**Trial 1**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.2469,
+    "model_score": 0.8162,
+    "style_score": 0.6566,
+    "label": "We think this was probably written by AI, or with heavy AI assistance.",
+    "sent": "Artificial intelligence is transforming the way organizations operate "
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0957,
+    "model_score": 0.1897,
+    "style_score": 0.4433,
+    "label": "We think this was probably written by a person.",
+    "sent": "ok so the bus was late AGAIN and i'm standing there in the drizzle lik"
+  }
+]
+```
+
+**Trial 2**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.2469,
+    "model_score": 0.8162,
+    "style_score": 0.6566,
+    "label": "We think this was probably written by AI, or with heavy AI assistance.",
+    "sent": "Artificial intelligence is transforming the way organizations operate "
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0957,
+    "model_score": 0.1897,
+    "style_score": 0.4433,
+    "label": "We think this was probably written by a person.",
+    "sent": "ok so the bus was late AGAIN and i'm standing there in the drizzle lik"
+  }
+]
+```
+
+**Trial 3**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.2469,
+    "model_score": 0.8162,
+    "style_score": 0.6566,
+    "label": "We think this was probably written by AI, or with heavy AI assistance.",
+    "sent": "Artificial intelligence is transforming the way organizations operate "
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0957,
+    "model_score": 0.1897,
+    "style_score": 0.4433,
+    "label": "We think this was probably written by a person.",
+    "sent": "ok so the bus was late AGAIN and i'm standing there in the drizzle lik"
+  }
+]
+```
+
+### label coverage
+
+**Trial 1**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.2469,
+    "model_score": 0.8162,
+    "style_score": 0.6566,
+    "label": "We think this was probably written by AI, or with heavy AI assistance.",
+    "sent": "Artificial intelligence is transforming the way organizations operate "
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0957,
+    "model_score": 0.1897,
+    "style_score": 0.4433,
+    "label": "We think this was probably written by a person.",
+    "sent": "ok so the bus was late AGAIN and i'm standing there in the drizzle lik"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.2373,
+    "model_score": 0.6175,
+    "style_score": 0.6113,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "We got to the campsite about four. The pitch was fine, a bit sloped, b"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.9527,
+    "model_score": 0.4588,
+    "style_score": 0.5554,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "Artificial intelligence is changing how organizations operate. By usin"
+  }
+]
+```
+
+**Trial 2**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.2469,
+    "model_score": 0.8162,
+    "style_score": 0.6566,
+    "label": "We think this was probably written by AI, or with heavy AI assistance.",
+    "sent": "Artificial intelligence is transforming the way organizations operate "
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0957,
+    "model_score": 0.1897,
+    "style_score": 0.4433,
+    "label": "We think this was probably written by a person.",
+    "sent": "ok so the bus was late AGAIN and i'm standing there in the drizzle lik"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.2373,
+    "model_score": 0.6175,
+    "style_score": 0.6113,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "We got to the campsite about four. The pitch was fine, a bit sloped, b"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.9527,
+    "model_score": 0.4588,
+    "style_score": 0.5554,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "Artificial intelligence is changing how organizations operate. By usin"
+  }
+]
+```
+
+**Trial 3**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.2469,
+    "model_score": 0.8162,
+    "style_score": 0.6566,
+    "label": "We think this was probably written by AI, or with heavy AI assistance.",
+    "sent": "Artificial intelligence is transforming the way organizations operate "
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0957,
+    "model_score": 0.1897,
+    "style_score": 0.4433,
+    "label": "We think this was probably written by a person.",
+    "sent": "ok so the bus was late AGAIN and i'm standing there in the drizzle lik"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.2373,
+    "model_score": 0.6175,
+    "style_score": 0.6113,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "We got to the campsite about four. The pitch was fine, a bit sloped, b"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.9527,
+    "model_score": 0.4588,
+    "style_score": 0.5554,
+    "label": "We couldn't tell either way. This piece could have been written by a person or by AI \u2014 treat this result as inconclusive, not as an accusation.",
+    "sent": "Artificial intelligence is changing how organizations operate. By usin"
+  }
+]
+```
+
+### bad input
+
+**Trial 1**
+
+```json
+[
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "{\"creator_id\": \"eval_bad_missing\"}"
+  },
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "(empty text)"
+  },
+  {
+    "status": 413,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "word word word word word word word word word word word word word word "
+  }
+]
+```
+
+**Trial 2**
+
+```json
+[
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "{\"creator_id\": \"eval_bad_missing\"}"
+  },
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "(empty text)"
+  },
+  {
+    "status": 413,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "word word word word word word word word word word word word word word "
+  }
+]
+```
+
+**Trial 3**
+
+```json
+[
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "{\"creator_id\": \"eval_bad_missing\"}"
+  },
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "(empty text)"
+  },
+  {
+    "status": 413,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "word word word word word word word word word word word word word word "
+  }
+]
+```
