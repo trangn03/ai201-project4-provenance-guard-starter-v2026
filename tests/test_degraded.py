@@ -1,16 +1,16 @@
 """
 Tests for the degraded-mode extension (Shape B: harden against failure).
 
-    python test_degraded.py             readable report, grouped by criterion
-    python test_degraded.py --plain     the standard unittest output
-    python -m unittest test_degraded    the same tests, for any test runner
+    python tests/test_degraded.py             readable report, grouped by criterion
+    python tests/test_degraded.py --plain     the standard unittest output
+    python -m unittest discover -s tests      every test in this folder, any runner
 
 These need no running service and no model download. The model signal is
 replaced with one that fails (or succeeds) on demand, requests go through
 Flask's test client, and the audit log is pointed at a temp file so your real
 logs/audit.jsonl is not touched.
 
-They are fast and deterministic, which complements degraded_check.py: that one
+They are fast and deterministic, which complements tools/degraded_check.py: that one
 breaks the real model on a real running service, this one pins the logic.
 Each test's first docstring line is the sentence the report prints.
 """
@@ -22,6 +22,8 @@ import time
 import unittest
 from pathlib import Path
 from unittest import mock
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))    # the project root, where app.py lives
 
 import app as app_module
 import config

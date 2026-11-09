@@ -1,9 +1,9 @@
 """
 Tests for the structured run log (runlog.py, the hooks in app.py).
 
-    python test_runlog.py             report, grouped
-    python test_runlog.py --plain     the standard unittest output
-    python -m unittest test_runlog    the same tests, for any runner
+    python tests/test_runlog.py             report, grouped
+    python tests/test_runlog.py --plain     the standard unittest output
+    python -m unittest discover -s tests    every test in this folder, any runner
 
 No server and no model: the model signal is replaced, requests go through
 Flask's test client, and logs go to a temp directory so logs/runs.jsonl and
@@ -20,6 +20,8 @@ import time
 import unittest
 from pathlib import Path
 from unittest import mock
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))    # the project root, where app.py lives
 
 import app as app_module
 import config

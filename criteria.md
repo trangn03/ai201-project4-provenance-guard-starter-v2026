@@ -126,7 +126,7 @@ is one that can't be diagnosed.
 ## 6. A model failure still gets an answer
 
 With the service started with its model unable to load, 10 submissions
-(`python degraded_check.py --expect degraded`) each return a 200 with
+(`python tools/degraded_check.py --expect degraded`) each return a 200 with
 `degraded: true` and `model_score: null`, and none returns a 5xx, in every one
 of 3 trials.
 

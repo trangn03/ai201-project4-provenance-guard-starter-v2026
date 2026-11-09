@@ -236,7 +236,7 @@ and `detector_loaded` as `false`.
 With the broken service running:
 
 ```bash
-python degraded_check.py --expect degraded
+python tools/degraded_check.py --expect degraded
 ```
 
 It sends ten texts across three trials and checks the response and the audit
@@ -250,7 +250,7 @@ python app.py
 ```
 
 ```bash
-python degraded_check.py --expect normal
+python tools/degraded_check.py --expect normal
 ```
 
 If you skip clearing the variable, the "normal" server is still broken and the

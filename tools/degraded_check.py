@@ -6,8 +6,8 @@ scenarios.py can't express this: the service has to be STARTED with the model
 broken (see DEGRADED_MODE.md), and the evidence is in the audit log as well as
 the response. Service must be running:
 
-    python degraded_check.py --expect degraded [--trials 3]   # model broken
-    python degraded_check.py --expect normal   [--trials 3]   # model working
+    python tools/degraded_check.py --expect degraded [--trials 3]   # model broken
+    python tools/degraded_check.py --expect normal   [--trials 3]   # model working
 
 With --expect degraded, every submission must: return 200, say degraded=true
 with model_score null, never come back guess "ai", carry a reduced confidence,
@@ -18,8 +18,11 @@ old one.
 """
 import argparse
 import sys
+from pathlib import Path
 
 import requests
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))    # the project root, where config.py lives
 
 import config
 from scenarios import CLEARLY_AI, CLEARLY_HUMAN, PLAIN_HUMAN
