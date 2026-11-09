@@ -186,9 +186,27 @@ criterion is what checks that the choice worked. 9 of 9 because a log that is
 complete for eight kinds of failure and blind to the ninth cannot be relied on
 for any of them.
 
-*Checked by:* `tests/test_runlog.py` covers eight of the nine today. The
-oversize case (a 413) has no test yet, so as written this is **not yet shown to
-be met**.
+**Why not stricter, why not looser:** Looser would be 8 of 9, and the one I would
+be tempted to drop is the crash, which is the case this design exists for and
+the one that costs most when missing: an unrecorded 500 leaves no evidence at
+all except a writer's complaint. "Exactly one" rather than "at least one"
+because duplicates would inflate any failure rate read off the log. Stricter
+would be more kinds, but the nine are chosen by mechanism, not by branch. A
+rejection the route makes itself, a 429 the rate limiter raises before the
+route runs, and an unhandled exception all reach the log by different paths,
+and the nine cover each path more than once. A tenth kind, such as a
+non-string `creator_id`, goes through the same path as rejections already
+counted, so it would add a test and not any coverage. The one stricter demand I
+cannot meet is a record when the run log itself cannot be written: there is
+nowhere to put it, so `runlog.write` reports that to stderr instead.
+
+*How it is run:* `python tools/failure_check.py` triggers each of the nine kinds
+on purpose and counts the new records after each one. Six are real bad inputs,
+the rate limit is a real burst past the limiter, and two are injected, because a
+healthy service cannot be made to fail those ways without changing it: the model
+failure, and the crash inside the route, which is raised with Flask's exception
+propagation on, as in debug mode. The same exercise is a unit test in
+`tests/test_runlog.py`.
 
 ---
 
@@ -209,6 +227,21 @@ raising. The bound is deliberately well under a normal warm run (the
 measurement below puts that median at about 2.6 seconds) because the fallback
 has to be clearly better than waiting for the model, not merely equal to it.
 
+**Why not stricter, why not looser:** Looser, such as the 2.6 seconds a normal
+warm run takes, would let the fallback be as slow as the thing it replaces, so a
+writer would wait longest exactly when the service is broken. A looser maximum
+such as 10 seconds would also hide what this criterion is for, a slow first
+request. Stricter is limited by the design. Each degraded request still
+attempts the model load, because a failed load is not cached, and the second
+degraded request in my demo session took 0.7 seconds doing that, so a median of
+1 second sits just above what the retry costs. Going lower would mean
+remembering the failure, and then a service started before the model finished
+downloading would never recover without a restart; I would rather keep the
+retry. The 3-second maximum is three times the median. It is not tighter
+because this machine's timings varied 35-fold on identical input, so a tighter
+maximum would mostly measure the laptop, and any miss has to be diagnosed as
+the code or the machine before it counts.
+
 ---
 
 ## 9.3 The two logs agree
@@ -227,8 +260,25 @@ risk: both are append-only files written by a threaded server, and interleaved
 writes are the usual way a JSON-lines file ends up with a corrupt line. "Exactly
 40" rather than "about 40" because a lost record is the very failure 9.1 is about.
 
-*Checked by:* nothing yet. This needs a small script that sends the 40 requests
-and compares the three counts, so as written it is **not yet shown to be met**.
+**Why not stricter, why not looser:** Looser, such as "about 40" or "at least
+95%", is not available for a log. Unlike the detection signal, writing a line
+has no inherent error rate, so any missing record is a bug, and a log that is
+95% complete does not say which 5% is gone. The agreement check is exact for
+the same reason: both logs are written from the same variables, so a
+difference of even 0.01 means a different code path, not rounding. Stricter
+would be more load, but 40 requests from 8 clients is already more concurrency
+than this system sees. It serves one writer at a time on one machine, and its
+own limiter allows 6 requests a minute per `creator_id`, which is why the 40
+are spread across creator ids. More clients would mostly test Flask's
+development server. What this does not cover is more than one server process:
+`runlog.py` guards the file with a lock that exists only inside one process, so
+several workers (under gunicorn, for example) would be unprotected. That is out
+of scope while the system runs locally as one process.
+
+*How it is run:* `python tools/reconcile_check.py` starts the service and sends
+40 requests from 8 clients at once (3 valid texts and 2 bad inputs each), then
+counts the run records for them, checks every line of the run log, and compares
+each decision's run record with its audit entry.
 
 ---
 
@@ -242,6 +292,21 @@ use **3 seconds or less** of CPU, over at least 30 warm runs of one text
 wait. RUNNING.md says warm submissions take "a second or two", and 5 seconds at
 the 90th percentile is 2 to 3 times that, which is generous. A mean would hide
 what matters here, which is the slow runs, so the target is a percentile.
+
+**Why not stricter, why not looser:** Looser, such as the mean or the median,
+is the trap: the measured median is 2.6 seconds, which passes any reasonable
+limit, while one run in ten took 20 seconds or more. A writer's experience of
+this system is its slow runs. A looser time such as 10 seconds would be five
+times what RUNNING.md promises. Stricter, such as the 99th percentile or 2
+seconds, is limited by the sample: with 30 runs the 99th percentile is the
+single slowest run, so one outlier decides the result, and 2 seconds is what
+the quiet runs achieve (0.3 to 1.4 s in the demo session) but not what this
+laptop holds. The stakes also set how strict to be. A run that takes 8 seconds
+instead of 2 costs a writer some patience, where a wrong label (9.5) costs
+them an accusation. That is why this one is a percentile with room in it and
+9.5 is a count with none to spare. The CPU bound is separate because CPU is
+what a host would meter: 3 seconds is about 1.5 times the measured median of
+1.9 seconds.
 
 **Known to fail when written.** The 30-run measurement on this machine
 (`results/cost_2026-11-08_1812.md`) gave a median of 2.6 s but a 90th percentile
@@ -269,6 +334,21 @@ uses texts I did not pick to pass, so it cannot be met by my choice of examples.
 Two of eight rather than zero because some plain, formal human writing really is
 close to model output and I would rather say that than promise what two weak
 signals cannot do.
+
+**Why not stricter, why not looser:** Stricter, 0 of 8, would mean raising
+`AI_THRESHOLD` to about 0.76. The README already works through this: that clears
+all six accused texts but moves my clearly-AI calibration text (combined score
+0.7364) into "unsure", so the AI label would only be reachable for text more
+extreme than anything I tested, which would break criterion 3. Zero is the right
+aim and the wrong number for two signals that measure predictability and
+sentence shape, not authorship. Looser, such as 4 of 8, would accept accusing
+half of the plain and formal writers this signal is known to mistake for a
+machine, and the cost of each is a person told their own work is machine-made
+with only the appeal to answer back. Even the 2 I chose is one accusation in
+four on this kind of writing. It is the strictest number I can defend without
+losing the AI label, not one I consider acceptable. It is a count out of 8
+rather than a percentage because 8 texts cannot support a rate, and each of
+them is a person.
 
 **Known to fail when written.** In the 2026-11-08 regression attack run, 6 of
 the 8 (FP02 to FP07) come back as AI; only FP01 and FP08 are held at "unsure".

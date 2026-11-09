@@ -23,8 +23,11 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))    # the project root, where app.py lives
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+
 import app as app_module
 import config
+import failure_check
 import runlog
 
 sys.stdout.reconfigure(errors="replace")
@@ -268,6 +271,23 @@ class FailuresAreRecorded(Base):
         self.assertEqual(record["outcome"], "error")
         self.assertEqual(record["exception"]["type"], "OSError")
         self.assertEqual(record["input"]["preview"], TEXT)    # what was lost is still known
+
+    def test_oversize_text_is_recorded(self):
+        """Text over the size limit is a recorded 413 rejection"""
+        resp = self.submit("word " * 5000)
+        self.assertEqual(resp.status_code, 413)
+        record = self.only_run()
+        self.assertEqual(record["outcome"], "rejected")
+        self.assertEqual(record["status_code"], 413)
+        self.assertEqual(record["input"]["chars"], 25000)
+        self.assertEqual(len(record["input"]["preview"]), config.RUN_LOG_INPUT_CHARS)
+
+    def test_nine_kinds_of_failure_each_leave_exactly_one_record_with_a_reason(self):
+        """Criterion 9.1: nine kinds of failure, one record each, each with a reason"""
+        results = failure_check.exercise(self.client)
+        self.assertEqual(len(results), failure_check.KINDS)
+        bad = [(r["kind"], r["problem"]) for r in results if not r["ok"]]
+        self.assertEqual(bad, [], f"{failure_check.KINDS - len(bad)} of {failure_check.KINDS}: {bad}")
 
     def test_every_failure_kind_has_a_reason_to_read(self):
         """Every non-decided record carries something that says why"""

@@ -217,6 +217,8 @@ def main():
     parser.add_argument("--runs", type=int, default=10, help="warm runs per launch and per length")
     parser.add_argument("--launches", type=int, default=3, help="fresh server starts (cold starts)")
     parser.add_argument("--port", type=int, default=5002)
+    parser.add_argument("--no-lengths", action="store_true",
+                        help="skip the short and long text runs; measure only the medium text")
     args = parser.parse_args()
 
     if args.distribution:
@@ -245,7 +247,7 @@ def main():
                              "mem_before": mem_before, "mem_after": mem_after})
             print(f"launch {n}: startup {startup_s:.1f}s, cold run {cold['client_ms'] / 1000:.1f}s, "
                   f"warm mean {avg(warm, 'client_ms'):.0f} ms (n={len(warm)})")
-            if n == args.launches:
+            if n == args.launches and not args.no_lengths:
                 extra["short"] = measure(url, SHORT, "short", stamp, args.runs)
                 extra["long"] = measure(url, LONG, "long", stamp, args.runs)
         finally:
@@ -307,6 +309,7 @@ def main():
     path.write_text("\n".join(out) + "\n", encoding="utf-8")
     append_distribution(path, stamp)
     print("\n" + path.read_text(encoding="utf-8"))
+    print(f"run stamp: {stamp}")
     print(f"\nWrote {path}")
 
 

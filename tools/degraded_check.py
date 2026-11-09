@@ -18,6 +18,7 @@ old one.
 """
 import argparse
 import sys
+import time
 from pathlib import Path
 
 import requests
@@ -43,10 +44,10 @@ TEXTS = [
 ]
 
 
-def check_one(url, expect, trial, i, name, text):
+def check_one(url, expect, trial, i, name, text, tag=""):
     """Return a list of problems for one submission (empty means it passed)."""
     resp = requests.post(f"{url}/submit", json={
-        "text": text, "creator_id": f"degraded_{expect}_t{trial}_{i}"}, timeout=120)
+        "text": text, "creator_id": f"degraded_{expect}_{tag}_t{trial}_{i}"}, timeout=120)
     if resp.status_code != 200:
         return [f"status {resp.status_code}, wanted 200"]
     body = resp.json()
@@ -84,13 +85,16 @@ def main():
     parser.add_argument("--expect", choices=["degraded", "normal"], required=True)
     parser.add_argument("--trials", type=int, default=3)
     parser.add_argument("--url", default=f"http://{config.HOST}:{config.PORT}")
+    parser.add_argument("--tag", default=time.strftime("%Y%m%d%H%M%S"),
+                        help="goes into each creator_id, so one invocation's runs can be found in "
+                             "logs/runs.jsonl (creator_id degraded_<expect>_<tag>_t<trial>_<n>)")
     args = parser.parse_args()
 
     total_bad = 0
     for trial in range(1, args.trials + 1):
         ok = 0
         for i, (name, text) in enumerate(TEXTS, 1):
-            problems = check_one(args.url, args.expect, trial, i, name, text)
+            problems = check_one(args.url, args.expect, trial, i, name, text, args.tag)
             ok += not problems
             for p in problems:
                 print(f"  trial {trial} #{i} ({name}): FAIL {p}")
