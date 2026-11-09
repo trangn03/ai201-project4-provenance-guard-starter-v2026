@@ -257,9 +257,57 @@ class NormalPathIsUnchanged(Base):
         model.assert_not_called()
 
 
+class StartupPreload(unittest.TestCase):
+    """The 9.2 fix - The heavy imports happen at startup, not inside the first request"""
+
+    def test_preload_imports_the_libraries_but_loads_no_model(self):
+        """Preloading imports torch and transformers and loads no model"""
+        fake = {"torch": mock.MagicMock(), "transformers": mock.MagicMock()}
+        with mock.patch.dict(sys.modules, fake), \
+             mock.patch.object(detector, "_model", None), mock.patch.object(detector, "_tokenizer", None):
+            detector.preload_libraries()
+            self.assertIsNone(detector._model)
+            self.assertIsNone(detector._tokenizer)
+
+    def test_missing_libraries_are_left_for_load_to_report(self):
+        """Missing libraries do not crash startup; the first request still reports them"""
+        with mock.patch.dict(sys.modules, {"torch": None}), mock.patch.object(detector, "_model", None):
+            detector.preload_libraries()                        # must not raise
+            with self.assertRaises(detector.DetectorUnavailable):
+                detector._load()
+
+    def _main(self, preload, debug, reloader_child):
+        with mock.patch.object(config, "PRELOAD_LIBRARIES", preload), \
+             mock.patch.object(config, "DEBUG", debug), \
+             mock.patch.dict(os.environ), \
+             mock.patch.object(app_module.app, "run") as run, \
+             mock.patch("detector.preload_libraries") as preloaded, \
+             mock.patch("builtins.print"):
+            os.environ.pop("WERKZEUG_RUN_MAIN", None)
+            if reloader_child:
+                os.environ["WERKZEUG_RUN_MAIN"] = "true"
+            app_module.main()
+        self.assertEqual(run.call_count, 1)
+        return preloaded.called
+
+    def test_the_server_preloads_at_startup(self):
+        """Starting the server preloads the libraries before it listens"""
+        self.assertTrue(self._main(preload=True, debug=False, reloader_child=False))
+
+    def test_the_setting_turns_it_off(self):
+        """AI201_PRELOAD=0 gives the earlier behaviour back"""
+        self.assertFalse(self._main(preload=False, debug=False, reloader_child=False))
+
+    def test_debug_mode_preloads_once_not_twice(self):
+        """In debug mode only the reloader's child process preloads"""
+        self.assertFalse(self._main(preload=True, debug=True, reloader_child=False))
+        self.assertTrue(self._main(preload=True, debug=True, reloader_child=True))
+
+
 # ── The readable report ──────────────────────────────────────────────────────
 
-GROUPS = [DegradedAnswers, DegradedNeverAccuses, DegradedLeavesATrace, NormalPathIsUnchanged]
+GROUPS = [DegradedAnswers, DegradedNeverAccuses, DegradedLeavesATrace, NormalPathIsUnchanged,
+          StartupPreload]
 WIDTH = 72
 
 

@@ -4,6 +4,8 @@ and fill in the run log.
 
     python tools/run_unit9.py            3 separate runs, about 25 minutes
     python tools/run_unit9.py --runs 1
+    python tools/run_unit9.py --label after     keep this result set apart from an earlier one:
+                                                results/unit9_after/ and results/unit9_run_log_after.md
 
 Each run is a complete pass, started from scratch. What is run for each
 criterion, and why that and not something cheaper:
@@ -51,6 +53,7 @@ sys.stdout.reconfigure(errors="replace")
 ROOT = config.ROOT
 OUT = config.RESULTS_DIR / "unit9"
 PORT = 5007
+LABEL = ""
 ENV = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
 
 CRITERIA = [
@@ -80,10 +83,11 @@ def start_server(extra_env=None):
     proc = subprocess.Popen([sys.executable, "app.py"], env=env, cwd=str(ROOT),
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     url = f"http://127.0.0.1:{PORT}"
-    for _ in range(120):
+    began = time.perf_counter()
+    for _ in range(240):
         try:
             if requests.get(f"{url}/health", timeout=2).status_code == 200:
-                return proc, url
+                return proc, url, time.perf_counter() - began
         except requests.RequestException:
             time.sleep(0.5)
     proc.kill()
@@ -119,7 +123,8 @@ def one_run(n, evidence):
     step(run_dir, "unit_tests", ["-m", "unittest", "discover", "-s", "tests"])
 
     # 9.3 and 9.5 share one healthy server (9.3's warm-up request loads the model)
-    proc, url = start_server()
+    proc, url, up = start_server()
+    res["startup_s"] = up
     try:
         rc, out = step(run_dir, "9.3_reconcile", ["tools/reconcile_check.py", "--url", url])
         m = re.search(r"RESULT records=(\d+)/(\d+) malformed=(\d+) agree=(\d+)/(\d+)", out)
@@ -130,7 +135,7 @@ def one_run(n, evidence):
 
         rc, out = step(run_dir, "9.5_false_positives",
                        ["run_attacks.py", "--set", "attack_set", "--family", "false_positive",
-                        "--label", f"unit9_run{n}", "--url", url])
+                        "--label", f"unit9{LABEL}_run{n}", "--url", url])
         report = re.search(r"Wrote (\S*attack_run_\S+\.md)", out)
         rows = []
         if report:
@@ -146,14 +151,17 @@ def one_run(n, evidence):
         stop(proc, PORT)
 
     # 9.2 a new server with the model unable to load
-    tag = f"u9r{n}"
-    proc, url = start_server({"AI201_DETECTOR_MODEL": "does-not-exist-xyz"})
+    # Unique per result set AND per moment: an earlier set used the same names, and a
+    # lookup by prefix then returned both sets' records mixed together.
+    tag = f"u9{LABEL}r{n}t{datetime.now():%H%M%S}"
+    proc, url, up = start_server({"AI201_DETECTOR_MODEL": "does-not-exist-xyz"})
+    res["startup_broken_s"] = up
     try:
         rc, out = step(run_dir, "9.2_degraded", ["tools/degraded_check.py", "--expect", "degraded",
                                                   "--trials", "3", "--tag", tag, "--url", url])
     finally:
         stop(proc, PORT)
-    recs = records_for(f"degraded_degraded_{tag}_")
+    recs = records_for(f"degraded_degraded_{tag}_t")
     if recs:
         wall = [r["duration_ms"] for r in recs]
         res["9.2"] = {"n": len(recs), "median": statistics.median(wall), "max": max(wall),
@@ -230,7 +238,7 @@ def write_log(runs, evidence, started):
              f"model `{config.DETECTOR_MODEL}`.",
              f"- {len(runs)} separate runs, each a complete pass of all five criteria from scratch. "
              f"A criterion is MET only if every run meets its target.",
-             f"- Every step's output, untouched, is in `results/unit9/run1` to `run{len(runs)}`.", "",
+             f"- Every step's output, untouched, is in `{OUT.relative_to(ROOT).as_posix()}/run1` to `run{len(runs)}`.", "",
              "| Criterion | Target | " + " | ".join(f"Run {i}" for i in range(1, len(runs) + 1)) + " | Verdict |",
              "|---|---|" + "---|" * len(runs) + "---|"]
     for cid, name, target in CRITERIA:
@@ -238,6 +246,9 @@ def write_log(runs, evidence, started):
         verdict = "MET" if all(met(cid, run[cid]) for run in runs) else "MISSED"
         lines.append(f"| {cid} {name} | {target} | " + " | ".join(cells) + f" | {verdict} |")
 
+    ups = [r["startup_s"] for r in runs if "startup_s" in r]
+    lines += ["", f"Server start-up, seconds until `/health` answers (healthy server, one per run): "
+              + ", ".join(f"{u:.1f}" for u in ups) + f"; mean {statistics.mean(ups):.1f}.", ""]
     lines += ["", "## What actually came back (run 1)", "",
               "Real output from run 1, unedited. Each block names the file and function that produced it.", ""]
 
@@ -288,7 +299,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument("--label", default="", help="keep this result set apart, e.g. before or after")
     args = parser.parse_args()
+    global OUT, LABEL
+    if args.label:
+        LABEL = args.label
+        OUT = config.RESULTS_DIR / f"unit9_{args.label}"
     if listener_pid(PORT):
         raise SystemExit(f"port {PORT} is in use")
 
@@ -300,7 +316,7 @@ def main():
         print(f"  run {n} done: " + "; ".join(f"{cid} {cell(cid, runs[-1][cid])}" for cid, *_ in CRITERIA), flush=True)
 
     text = write_log(runs, evidence, started)
-    path = config.RESULTS_DIR / "unit9_run_log.md"
+    path = config.RESULTS_DIR / (f"unit9_run_log_{LABEL}.md" if LABEL else "unit9_run_log.md")
     path.write_text(text, encoding="utf-8")
     print("\n" + text.split("## What actually came back")[0])
     print(f"Wrote {path}")

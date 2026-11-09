@@ -53,6 +53,30 @@ class DetectorUnavailable(RuntimeError):
     """The model couldn't be loaded — no download yet, or no disk."""
 
 
+def preload_libraries():
+    """
+    Import torch and transformers now instead of inside the first request.
+
+    Those two imports take 11 to 14 seconds on this machine, and `_load()` below
+    does them lazily. That put the whole cost on whichever request came first,
+    including a request that was about to fall back to degraded mode anyway:
+    criterion 9.2 measured that first request at 9.6 to 13.5 seconds against 0.4
+    to 0.75 for the next 29. Calling this at server start moves the cost to
+    startup, where nobody is waiting on an answer.
+
+    It imports only. The model weights are still loaded lazily by `_load()`, so a
+    missing or broken model still surfaces as DetectorUnavailable on a request
+    and is still handled by degraded mode, not by a crash at startup. If the
+    libraries are not installed this does nothing, and `_load()` raises its
+    usual, more helpful error on first use.
+    """
+    try:
+        import torch  # noqa: F401
+        from transformers import AutoModelForCausalLM, AutoTokenizer  # noqa: F401
+    except ImportError:
+        pass
+
+
 def _load():
     """Load the model once and keep it. First call downloads ~550 MB."""
     global _model, _tokenizer

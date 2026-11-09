@@ -116,6 +116,12 @@ AI_THRESHOLD = 0.65
 # scoring.py::label_without_model, which never returns the "ai" label.
 DEGRADED_CONFIDENCE_FACTOR = 0.5
 
+# Import torch and transformers when the server starts, not inside the first
+# request (see detector.preload_libraries). Costs roughly 10 to 15 seconds at
+# startup, before the port opens; saves the same on the first request. Set
+# AI201_PRELOAD=0 to turn it off and get the earlier behaviour back.
+PRELOAD_LIBRARIES = os.getenv("AI201_PRELOAD", "1") == "1"
+
 
 # ─── Rate limiting (UNIT 8) ──────────────────────────────────────────────────
 # Off in unit 7. You turn it on and choose the numbers in unit 8, Milestone 1.

@@ -1115,7 +1115,7 @@ The entries as written to `logs/runs.jsonl`, unedited:
 - **The cold start is large.** Entry 1 took 67.8 s of wall time but only 22.7 s of CPU, so most of it was waiting rather than computing. `config.py` says the first call takes "ten to twenty seconds"; on this machine it took more than three times that.
 - **The rate limit behaves as configured.** The burst from one `creator_id` gets six 200s and then 429s, matching 6 per minute (entry 9 is the first of the 200s, entry 10 the first 429). The 429 is a record of its own, with no model time.
 - **Degraded mode is visible in the log.** Entries 11 and 12 have `outcome: degraded`, a null `model_score`, and the reason. Entry 11's `guess` is `unsure` even though its `style_score` (0.6566) is above `AI_THRESHOLD` (0.65), which is the cap in `scoring.label_without_model` doing its job, narrowly, and its `combined_score` is the style score alone.
-- **The first degraded request was slow.** Entry 11 took 38.1 s and 14.8 s of CPU before falling back; entry 12, the next one, took 0.7 s. I have not isolated the cause. My reading is that the first request still imports `torch` and `transformers` before the model load fails and the later ones do not, but I did not time the import separately. Both degraded entries say `cold_start: true` because the model never loaded, which is accurate but means the flag stays true for every degraded run.
+- **The first degraded request was slow.** Entry 11 took 38.1 s and 14.8 s of CPU before falling back; entry 12, the next one, took 0.7 s. I traced it later to the lazy import of `torch` and `transformers` inside that first request (importing them alone takes 11 to 14 s), and preloading them at startup brought the first degraded request from 16.7 s to 0.5 s; see the Run Log, Unit 9 section. Both degraded entries say `cold_start: true` because the model never loaded, which is accurate but means the flag stays true for every degraded run.
 - **The log keeps part of the submitted text.** `input.preview` holds up to 500 characters, which `audit.jsonl` does not. That is a choice to revisit if the text should not be stored.
 
 **What is not shown here:** a crash inside the route. There is no honest way to make the live service raise an unhandled error without changing its code, so that path (and a crash that propagates out of Flask, as in debug mode) is covered by `tests/test_runlog.py`, which passes 23 of 23 tests, not by a pasted record.
@@ -1149,7 +1149,239 @@ Length matters up to the model's token limit and then stops: warm CPU averaged 1
 
 The full report, with every warm run in order, is `results/cost_2026-11-08_1812.md`. The runs themselves are in `logs/runs.jsonl` under `creator_id`s starting `cost_20261108180312_`. A repeat takes about ten minutes, and should be done with nothing else running.
 
-This is what criteria 9.2 and 9.4 in `criteria.md` are measured against. 9.4 (90% of warm runs within 5 s) was known to fail when written, and does. 9.2 (a degraded answer in 1 s median, 3 s at most) is probably missed too, because of the 38.1 s first degraded request above, though I have not yet run it as written.
+This measurement is what criteria 9.2 and 9.4 in `criteria.md` were written against. I wrote 9.4 expecting it to fail, because this first measurement's 90th percentile was 20.9 s. It then held in all six later runs (90th percentile 0.5 to 1.5 s), so that slow tail did not reproduce. I think it was the machine, but I never found what was competing for it, so I cannot say. 9.2 was missed until the preload change described in the Run Log, Unit 9 section below.
+
+
+---
+
+## Run Log, Unit 9
+
+The five criteria in `criteria.md` (9.1 to 9.5) were run three separate times, each a complete pass started from scratch, by `python tools/run_unit9.py`: nine kinds of failure triggered on purpose, a fresh server started with the model unable to load, 40 requests from 8 clients at once, 30 warm runs on a fresh launch, and the eight false-positive texts. **A criterion is MET only if every one of the three runs meets its target.** A target of 9 against runs of 9, 8, 9 is a miss. Every step's untouched output is in `results/unit9_before/` and `results/unit9_after/`, and each set's table and evidence is in `results/unit9_run_log_before.md` and `results/unit9_run_log_after.md`.
+
+I ran the whole set twice: once as built (**before**), and once after a single improvement aimed at one of the diagnosed misses (**after**).
+
+### Before
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 9.1 Every failure kind leaves a record | 9 of 9 kinds leave exactly one record with a reason | 9 of 9 | 9 of 9 | 9 of 9 | MET |
+| 9.2 A degraded answer is quick | median ≤ 1 s and max ≤ 3 s with the model unable to load | median 0.5 s, max 13.5 s | median 0.4 s, max 12.9 s | median 0.5 s, max 9.6 s | MISSED |
+| 9.3 The two logs agree | 40 of 40 records, no bad lines, run and audit entries agree | 40/40 records, 24/24 agree | 40/40 records, 24/24 agree | 40/40 records, 24/24 agree | MET |
+| 9.4 A writer does not wait long | 90% of 30 warm runs ≤ 5 s wall and ≤ 3 s CPU | p90 0.7 s wall, 2.0 s CPU | p90 0.5 s wall, 1.4 s CPU | p90 1.5 s wall, 1.7 s CPU | MET |
+| 9.5 Plain human writing is not accused | ≤ 2 of 8 plain-human texts labelled AI | 6 of 8 accused | 6 of 8 accused | 6 of 8 accused | MISSED |
+
+### After the improvement
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 9.1 Every failure kind leaves a record | 9 of 9 kinds leave exactly one record with a reason | 9 of 9 | 9 of 9 | 9 of 9 | MET |
+| 9.2 A degraded answer is quick | median ≤ 1 s and max ≤ 3 s with the model unable to load | median 0.5 s, max 0.6 s | median 0.4 s, max 1.0 s | median 0.8 s, max 1.0 s | MET |
+| 9.3 The two logs agree | 40 of 40 records, no bad lines, run and audit entries agree | 40/40 records, 24/24 agree | 40/40 records, 24/24 agree | 40/40 records, 24/24 agree | MET |
+| 9.4 A writer does not wait long | 90% of 30 warm runs ≤ 5 s wall and ≤ 3 s CPU | p90 0.8 s wall, 1.5 s CPU | p90 0.6 s wall, 1.6 s CPU | p90 0.5 s wall, 1.4 s CPU | MET |
+| 9.5 Plain human writing is not accused | ≤ 2 of 8 plain-human texts labelled AI | 6 of 8 accused | 6 of 8 accused | 6 of 8 accused | MISSED |
+
+Server start-up, seconds until `/health` answers (healthy server, one per run): 50.4, 20.6, 15.7; mean 28.9.
+
+### Side by side
+
+| Criterion | Target | Before: runs 1 / 2 / 3 | Before | After: runs 1 / 2 / 3 | After | Changed |
+|---|---|---|---|---|---|---|
+| 9.1 Every failure kind leaves a record | 9 of 9 kinds leave exactly one record with a reason | 9 of 9 / 9 of 9 / 9 of 9 | **MET** | 9 of 9 / 9 of 9 / 9 of 9 | **MET** | no |
+| 9.2 A degraded answer is quick | median ≤ 1 s and max ≤ 3 s with the model unable to load | median 0.5 s, max 13.5 s / median 0.4 s, max 12.9 s / median 0.5 s, max 9.6 s | **MISSED** | median 0.5 s, max 0.6 s / median 0.4 s, max 1.0 s / median 0.8 s, max 1.0 s | **MET** | yes |
+| 9.3 The two logs agree | 40 of 40 records, no bad lines, run and audit entries agree | 40/40 records, 24/24 agree / 40/40 records, 24/24 agree / 40/40 records, 24/24 agree | **MET** | 40/40 records, 24/24 agree / 40/40 records, 24/24 agree / 40/40 records, 24/24 agree | **MET** | no |
+| 9.4 A writer does not wait long | 90% of 30 warm runs ≤ 5 s wall and ≤ 3 s CPU | p90 0.7 s wall, 2.0 s CPU / p90 0.5 s wall, 1.4 s CPU / p90 1.5 s wall, 1.7 s CPU | **MET** | p90 0.8 s wall, 1.5 s CPU / p90 0.6 s wall, 1.6 s CPU / p90 0.5 s wall, 1.4 s CPU | **MET** | no |
+| 9.5 Plain human writing is not accused | ≤ 2 of 8 plain-human texts labelled AI | 6 of 8 accused / 6 of 8 accused / 6 of 8 accused | **MISSED** | 6 of 8 accused / 6 of 8 accused / 6 of 8 accused | **MISSED** | no |
+
+**Verdicts, against the targets as written:**
+
+- **9.1 MET.** 9 of 9 in all six runs. Two of the nine kinds are injected (the model failure and the route crash), so this shows the recording works, not that the live service has crashed and been caught.
+- **9.2 MISSED before, MET after.** Before, the median was fine (0.4 to 0.5 s) but the maximum was 9.6, 12.9 and 13.5 s against a limit of 3 s, so the target failed in every run. After: maximum 0.6, 1.0 and 1.0 s. Run 3's median was 0.8 s against a limit of 1 s, so it holds with little margin.
+- **9.3 MET.** 40 of 40 records and 24 of 24 decisions agreeing in all six runs, with no malformed lines.
+- **9.4 MET, with a caveat.** The 90th percentile was 0.5 to 1.5 s wall and 1.4 to 2.0 s CPU in all six runs. But the same code gave a 90th percentile of 20.9 s in my first measurement (`results/cost_2026-11-08_1812.md`, described under What It Costs). The rule is that the target holds in every run, and it did, but it holds on a quiet machine and has not held on a busy one.
+- **9.5 MISSED, before and after.** 6 of 8 accused (FP02 to FP07) in all six runs, against a limit of 2. The improvement did not aim at it, and the numbers did not move.
+
+*A mistake of mine worth recording:* my first attempt at the after set reported 9.2's maximum as 13.5 s, identical to the before set. The two sets had given their requests the same names, so the lookup returned both sets' records mixed together. I noticed because the number matched exactly, stopped the run, made the names unique per set, and ran the whole after set again. The tables above are from that clean second run.
+
+### Diagnosis of the misses
+
+**9.2 (before): the first request pays for the library imports.** The stage is signal one's loading, in `detector.py::_load`, which imports `torch` and `transformers` lazily, inside whichever request arrives first. The mechanism: that first degraded request has to finish those imports before the model load can even fail. Importing them on their own takes 14.2, 11.2 and 13.6 s on this machine, and the first degraded request took 13.5, 12.9 and 9.6 s. The other 29 requests in each run took 0.4 to 0.75 s because the imports are cached after the first. In every run exactly one request, the first, exceeded 3 s. The improvement below confirmed this directly.
+
+**9.5: signal one reads plain writing as predictable, and the safeguard against that has nothing to trigger on.** The stage is signal one (`detector.py::model_signal`), with the combining stage (`scoring.py::combine_signals`) unable to correct it. The mechanism, from the run log for the six accused texts:
+
+| Text | `model_score` | `style_score` | Gap | Combined | Guess |
+| ---- | ------------- | ------------- | --- | -------- | ----- |
+| FP02 | 0.7387 | 0.6830 | 0.056 | 0.7108 | ai |
+| FP03 | 0.8051 | 0.6496 | 0.156 | 0.7273 | ai |
+| FP04 | 0.8329 | 0.6082 | 0.225 | 0.7206 | ai |
+| FP05 | 0.8005 | 0.7125 | 0.088 | 0.7565 | ai |
+| FP06 | 0.8814 | 0.5822 | 0.299 | 0.7318 | ai |
+| FP07 | 0.8816 | 0.6038 | 0.278 | 0.7427 | ai |
+
+Signal one scores all six between 0.74 and 0.88, because formal, careful or repetitive writing is made of common words in ordinary sentences, which is what low perplexity rewards whoever wrote it. Signal two agrees weakly (0.58 to 0.71). The rule I wrote to protect writers in `combine_signals` pulls the score toward the human reading only when the signals differ by more than `SIGNAL_DISAGREEMENT_THRESHOLD` (0.35), and the largest gap here is 0.299, so it never fired in any of the six. It returned the plain average, 0.71 to 0.76, and `score_to_label` at `AI_THRESHOLD` 0.65 called every one "ai". I checked which signal matters by recomputing the combined score with each one neutralised to 0.5: with signal one neutral, **0 of 6** are still accused; with signal two neutral, 3 of 6 still are. Signal one is necessary; signal two alone is not enough (on its own it would accuse 2 of the 6, where signal one alone would accuse all 6).
+
+**The pattern.** Both misses trace to the same stage, signal one, the local GPT-2, but by two different mechanisms, so this is not one bug with two symptoms. One is what signal one costs: its imports happen inside a request. The other is what signal one means: perplexity is not authorship. They share a root in a design choice, that the main signal is a small local language model, which is also why it took about 98% of a warm run's time in the first cost measurement and why the one thing I hardened against, a model that fails to load, exists at all. Signal two never failed a criterion (it takes 0.2 to 20 ms).
+
+### The improvement
+
+**One change, aimed at 9.2:** import `torch` and `transformers` when the server starts instead of inside the first request. `detector.py::preload_libraries` does the imports, `app.py::main` calls it before the server listens (only once in debug mode, where Flask's reloader runs `main` twice), and `config.py::PRELOAD_LIBRARIES` (environment variable `AI201_PRELOAD`, default on) switches it off. It imports only; the model weights are still loaded lazily, so a missing model still surfaces as `DetectorUnavailable` on a request and is still handled by degraded mode, not by a crash at startup. Five tests pin it (`StartupPreload` in `tests/test_degraded.py`).
+
+I did not pick 9.5. The only change that clears it is raising `AI_THRESHOLD` toward 0.76, which, as What's Still Broken says, moves my clearly-AI calibration text (0.7364) into "unsure" and breaks criterion 3. That trades wrongful accusations against missed detections and is a decision about who pays for the error, not a repair, so I left it for you to make.
+
+### Did it help?
+
+**For what it aimed at, yes. It also moved a cost, and one thing looked worse that I could not explain.**
+
+Two result sets taken at different times on a laptop that has shown it can slow down by itself cannot isolate one change, so I also ran a controlled comparison in one session (`python tools/startup_check.py`, `results/startup_check.md`), flipping the switch off and on in alternating trials, each with a fresh server:
+
+| Measure | Preload off (each trial) | Off mean | Preload on (each trial) | On mean |
+|---|---|---|---|---|
+| Start-up, healthy (s) | 1.0, 1.6, 1.1 | **1.2** | 16.3, 10.6, 12.6 | **13.2** |
+| First normal request (s) | 16.3, 17.5, 14.7 | **16.1** | 6.3, 3.0, 7.5 | **5.6** |
+| Start-up, model broken (s) | 1.7, 2.6, 1.1 | **1.8** | 15.1, 16.1, 10.1 | **13.8** |
+| First degraded request (s) | 18.0, 18.9, 13.3 | **16.7** | 0.5, 0.5, 0.5 | **0.5** |
+| Second degraded request (s) | 0.4, 0.7, 0.4 | **0.5** | 0.7, 0.4, 0.5 | **0.5** |
+| Second normal request (s) | 0.4, 0.8, 0.7 | **0.6** | 2.2, 0.6, 5.9 | **2.9** |
+
+- **Better, and not by noise.** The first degraded request fell from 13.3 to 18.9 s (mean 16.7) to 0.5 s in all three trials with the change, with no overlap between the two groups. That confirms the diagnosis and is why 9.2 went from MISSED to MET. The first normal request also fell, from 16.1 s to 5.6 s on average.
+- **Worse: the wait moved, it did not go away.** Start-up went from 1.2 s to 13.2 s on a healthy server, and from 1.8 s to 13.8 s with the model broken. Counting from launch to the first normal answer, the total was 17.3 s without the change and 18.8 s with it, so the first writer to arrive right after a launch waits about as long as before. The gain is for every request after that, and for a degraded one (18.5 s from launch to first answer without the change, 14.3 s with it). In the after set the start-up took 50.4, 20.6 and 15.7 s, longer than this controlled run; I did not find out why the first of those was so slow.
+- **Unexplained: the second normal request was slower with the change in two of three trials** (2.2 and 5.9 s, against 0.4 to 0.8 s without it). I do not know whether that is noise or an effect. The 30-run sets do not show it, since the 90th percentile of warm runs was 0.5 to 0.8 s after the change and 0.5 to 1.5 s before, so I am treating it as noise, but I have not shown that.
+- **No change elsewhere.** 9.1, 9.3 and 9.4 were MET before and after, and 9.5 stayed at 6 of 8 accused.
+
+So the verdict is mixed rather than clean: it fixed the miss it was aimed at and the diagnosis held, it cost about 12 seconds of start-up, and it did nothing for the false positives, which remain the larger problem.
+
+### Real output
+
+Run 1 of the **before** set, unedited. Each block names the file and function that produced it. The 9.2 block is the miss: look at the first of its three records.
+
+Real output from run 1, unedited. Each block names the file and function that produced it.
+
+#### 9.1 Every failure kind leaves a record
+
+Produced by `tools/failure_check.py::main` (via `exercise`), which sends the requests through `app.py::submit`. The records are the lines `runlog.py::write` appended, built by `runlog.py::build_record` from the hooks in `app.py::_write_run`. The first two blocks are the summary the tool printed; the JSON lines are the records themselves.
+
+```
+kind                       status  outcome       reason
+------------------------------------------------------------------------------
+empty text                    400  rejected      text is required and must be a non
+text too short                400  rejected      Text needs at least 5 words that c
+control character             400  rejected      Text contains control characters.
+text missing                  400  rejected      text is required and must be a non
+body not a JSON object        400  rejected      Request body must be a JSON object
+text over the size limit      413  rejected      Text is over 20,000 characters.
+rate limited                  429  rate_limited  Too many submissions. Try again sh
+model cannot load             200  degraded      RuntimeError: model could not be l
+crash inside the route        500  error         unhandled error in the route
+
+The records, as runlog.write wrote them:
+{"timestamp": "2026-11-09T02:36:10.370+00:00", "run_id": "e2b7080b2b8e405ea179f0e4a9871d63", "content_id": null, "route": "/submit", "status_code": 400, "outcome": "rejected", "creator_id": "failure_check_a", "input": {"type": "str", "chars": 0, "words": 0, "preview": ""}, "output": {"status_code": 400, "guess": null, "confidence": null, "label": null, "error": "invalid_request", "message": "text is required and must be a non-empty string."}, "duration_ms": 34.5, "cpu_ms": 15.6, "model_ms": null, "style_ms": null, "cold_start": null, "model_score": null, "style_score": null, "combined_score": null, "degraded": false, "degraded_reason": null, "exception": null, "config": {"detector_model": "gpt2", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+{"timestamp": "2026-11-09T02:36:10.415+00:00", "run_id": "fd63d4b8ebe446d7b1de93b2cdee8f0f", "content_id": null, "route": "/submit", "status_code": 400, "outcome": "rejected", "creator_id": "failure_check_b", "input": {"type": "str", "chars": 8, "words": 2, "preview": "hi there"}, "output": {"status_code": 400, "guess": null, "confidence": null, "label": null, "error": "invalid_request", "message": "Text needs at least 5 words that contain letters."}, "duration_ms": 5.3, "cpu_ms": 0.0, "model_ms": null, "style_ms": null, "cold_start": null, "model_score": null, "style_score": null, "combined_score": null, "degraded": false, "degraded_reason": null, "exception": null, "config": {"detector_model": "gpt2", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+{"timestamp": "2026-11-09T02:36:10.434+00:00", "run_id": "88d4093376b24eb9b8580d83b1020f91", "content_id": null, "route": "/submit", "status_code": 400, "outcome": "rejected", "creator_id": "failure_check_c", "input": {"type": "str", "chars": 35, "words": 8, "preview": "Hello there\u0007 this has a bell in it."}, "output": {"status_code": 400, "guess": null, "confidence": null, "label": null, "error": "invalid_request", "message": "Text contains control characters."}, "duration_ms": 2.3, "cpu_ms": 0.0, "model_ms": null, "style_ms": null, "cold_start": null, "model_score": null, "style_score": null, "combined_score": null, "degraded": false, "degraded_reason": null, "exception": null, "config": {"detector_model": "gpt2", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+{"timestamp": "2026-11-09T02:36:10.461+00:00", "run_id": "7713d706596546748711b9bf50fd97c3", "content_id": null, "route": "/submit", "status_code": 400, "outcome": "rejected", "creator_id": "failure_check_d", "input": {"type": "missing", "chars": null, "words": null, "preview": null}, "output": {"status_code": 400, "guess": null, "confidence": null, "label": null, "error": "invalid_request", "message": "text is required and must be a non-empty string."}, "duration_ms": 5.0, "cpu_ms": 0.0, "model_ms": null, "style_ms": null, "cold_start": null, "model_score": null, "style_score": null, "combined_score": null, "degraded": false, "degraded_reason": null, "exception": null, "config": {"detector_model": "gpt2", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+{"timestamp": "2026-11-09T02:36:10.482+00:00", "run_id": "97016c551ceb4622951196e6deec7924", "content_id": null, "route": "/submit", "status_code": 400, "outcome": "rejected", "creator_id": null, "input": {"type": "missing", "chars": null, "words": null, "preview": null}, "output": {"status_code": 400, "guess": null, "confidence": null, "label": null, "error": "invalid_request", "message": "Request body must be a JSON object."}, "duration_ms": 2.1, "cpu_ms": 0.0, "model_ms": null, "style_ms": null, "cold_start": null, "model_score": null, "style_score": null, "combined_score": null, "degraded": false, "degraded_reason": null, "exception": null, "config": {"detector_model": "gpt2", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+{"timestamp": "2026-11-09T02:36:10.509+00:00", "run_id": "e52ff3dd19a141a095052bba7c4d57e4", "content_id": null, "route": "/submit", "status_code": 413, "outcome": "rejected", "creator_id": "failure_check_1", "input": {"type": "str", "chars": 25000, "words": 5000, "preview": "word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word "}, "output": {"status_code": 413, "guess": null, "confidence": null, "label": null, "error": "invalid_request", "message": "Text is over 20,000 characters."}, "duration_ms": 4.4, "cpu_ms": 0.0, "model_ms": null, "style_ms": null, "cold_start": null, "model_score": null, "style_score": null, "combined_score": null, "degraded": false, "degraded_reason": null, "exception": null, "config": {"detector_model": "gpt2", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+{"timestamp": "2026-11-09T02:36:10.653+00:00", "run_id": "9f8e7fcad91d4364a0d3004a00fd47c7", "content_id": null, "route": "/submit", "status_code": 429, "outcome": "rate_limited", "creator_id": "failure_check_rate", "input": {"type": "str", "chars": 60, "words": 12, "preview": "We missed the last train, so we walked home along the canal."}, "output": {"status_code": 429, "guess": null, "confidence": null, "label": null, "error": "rate_limited", "message": "Too many submissions. Try again shortly."}, "duration_ms": 2.0, "cpu_ms": 0.0, "model_ms": null, "style_ms": null, "cold_start": null, "model_score": null, "style_score": null, "combined_score": null, "degraded": false, "degraded_reason": null, "exception": null, "config": {"detector_model": "gpt2", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+{"timestamp": "2026-11-09T02:36:10.670+00:00", "run_id": "94c89211e12c40069a84f0f647c1b9d8", "content_id": "325e50c0-58c5-46f2-8c72-c80edb89c984", "route": "/submit", "status_code": 200, "outcome": "degraded", "creator_id": "failure_check_2", "input": {"type": "str", "chars": 60, "words": 12, "preview": "We missed the last train, so we walked home along the canal."}, "output": {"status_code": 200, "guess": "unsure", "confidence": 0.0, "label": "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation. Only part of our check could run, so this is less certain than usual.", "error": null, "message": null}, "duration_ms": 5.2, "cpu_ms": 0.0, "model_ms": 0.0, "style_ms": 0.0, "cold_start": true, "model_score": null, "style_score": 0.7222, "combined_score": 0.7222, "degraded": true, "degraded_reason": "RuntimeError: model could not be loaded", "exception": null, "config": {"detector_model": "gpt2", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+{"timestamp": "2026-11-09T02:36:10.698+00:00", "run_id": "39f8a9fdf2ff452cbbb73c9d08f194de", "content_id": null, "route": "/submit", "status_code": 500, "outcome": "error", "creator_id": "failure_check_3", "input": {"type": "str", "chars": 60, "words": 12, "preview": "We missed the last train, so we walked home along the canal."}, "output": {"status_code": 500, "guess": null, "confidence": null, "label": null, "error": null, "message": null}, "duration_ms": 1.6, "cpu_ms": 0.0, "model_ms": 0.1, "style_ms": null, "cold_start": true, "model_score": null, "style_score": null, "combined_score": null, "degraded": false, "degraded_reason": null, "exception": {"type": "RuntimeError", "message": "unhandled error in the route", "traceback": "\\site-packages\\flask\\app.py\", line 1511, in wsgi_app\n    response = self.full_dispatch_request()\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\xtran\\Downloads\\ai201-project4-provenance-guard-starter-v2026\\.venv\\Lib\\site-packages\\flask\\app.py\", line 919, in full_dispatch_request\n    rv = self.handle_user_exception(e)\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\xtran\\Downloads\\ai201-project4-provenance-guard-starter-v2026\\.venv\\Lib\\site-packages\\flask\\app.py\", line 917, in full_dispatch_request\n    rv = self.dispatch_request()\n         ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\xtran\\Downloads\\ai201-project4-provenance-guard-starter-v2026\\.venv\\Lib\\site-packages\\flask\\app.py\", line 902, in dispatch_request\n    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\xtran\\Downloads\\ai201-project4-provenance-guard-starter-v2026\\.venv\\Lib\\site-packages\\flask_limiter\\extension.py\", line 1314, in __inner\n    return cast(R, flask.current_app.ensure_sync(obj)(*a, **k))\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\xtran\\Downloads\\ai201-project4-provenance-guard-starter-v2026\\app.py\", line 368, in submit\n    style_score = stylometry.style_signal(text)\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\xtran\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\mock.py\", line 1124, in __call__\n    return self._mock_call(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\xtran\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\mock.py\", line 1128, in _mock_call\n    return self._execute_mock_call(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\xtran\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\unittest\\mock.py\", line 1183, in _execute_mock_call\n    raise effect\nRuntimeError: unhandled error in the route\n"}, "config": {"detector_model": "gpt2", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+
+RESULT kinds_ok=9/9
+```
+
+#### 9.2 A degraded answer is quick
+
+Produced by `tools/degraded_check.py::main` against a server started with `AI201_DETECTOR_MODEL=does-not-exist-xyz`. The fallback is `app.py::submit` calling `scoring.py::label_without_model`; the timings are `duration_ms` in the records `runlog.py::write` appended to `logs/runs.jsonl`. Below: what the tool printed, then the first request, the median request and the last request of the 30, as written.
+
+```
+trial 1: 10/10 behaved as 'degraded'
+trial 2: 10/10 behaved as 'degraded'
+trial 3: 10/10 behaved as 'degraded'
+```
+
+```json
+{"timestamp": "2026-11-09T02:37:11.626+00:00", "run_id": "57f67958f0704350a1739bdd19728260", "content_id": "0b51a297-7395-49ee-83f9-c61aa12478f2", "route": "/submit", "status_code": 200, "outcome": "degraded", "creator_id": "degraded_degraded_u9r1_t1_1", "input": {"type": "str", "chars": 681, "words": 84, "preview": "Artificial intelligence is transforming the way organizations operate in the modern world. By leveraging advanced algorithms, businesses can streamline their processes, enhance productivity, and deliver more personalized experiences to their customers. Furthermore, the integration of machine learning into everyday workflows enables teams to make data-driven decisions with greater confidence. It is important to note that responsible adoption requires careful consideration of ethical implications,"}, "output": {"status_code": 200, "guess": "unsure", "confidence": 0.0, "label": "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation. Only part of our check could run, so this is less certain than usual.", "error": null, "message": null}, "duration_ms": 13466.9, "cpu_ms": 8828.1, "model_ms": 13454.8, "style_ms": 0.5, "cold_start": true, "model_score": null, "style_score": 0.6566, "combined_score": 0.6566, "degraded": true, "degraded_reason": "DetectorUnavailable: Couldn't load 'does-not-exist-xyz': does-not-exist-xyz is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models' If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth", "exception": null, "config": {"detector_model": "does-not-exist-xyz", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+{"timestamp": "2026-11-09T02:37:26.244+00:00", "run_id": "badf61e5b4b4439781210582a3e03392", "content_id": "7156f84a-95a4-4fef-a874-765fa3662d60", "route": "/submit", "status_code": 200, "outcome": "degraded", "creator_id": "degraded_degraded_u9r1_t3_7", "input": {"type": "str", "chars": 60, "words": 12, "preview": "We missed the last train, so we walked home along the canal."}, "output": {"status_code": 200, "guess": "unsure", "confidence": 0.0, "label": "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation. Only part of our check could run, so this is less certain than usual.", "error": null, "message": null}, "duration_ms": 484.4, "cpu_ms": 281.2, "model_ms": 482.6, "style_ms": 0.0, "cold_start": true, "model_score": null, "style_score": 0.7222, "combined_score": 0.7222, "degraded": true, "degraded_reason": "DetectorUnavailable: Couldn't load 'does-not-exist-xyz': does-not-exist-xyz is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models' If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth", "exception": null, "config": {"detector_model": "does-not-exist-xyz", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+{"timestamp": "2026-11-09T02:37:28.040+00:00", "run_id": "64ead15b731f44358fe71f37e0983c3c", "content_id": "26409507-d80b-4924-b9c7-beedce9f1ac9", "route": "/submit", "status_code": 200, "outcome": "degraded", "creator_id": "degraded_degraded_u9r1_t3_10", "input": {"type": "str", "chars": 62, "words": 13, "preview": "I still have the first letter she sent me, folded in a drawer."}, "output": {"status_code": 200, "guess": "unsure", "confidence": 0.0, "label": "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation. Only part of our check could run, so this is less certain than usual.", "error": null, "message": null}, "duration_ms": 552.2, "cpu_ms": 375.0, "model_ms": 549.8, "style_ms": 0.0, "cold_start": true, "model_score": null, "style_score": 0.6667, "combined_score": 0.6667, "degraded": true, "degraded_reason": "DetectorUnavailable: Couldn't load 'does-not-exist-xyz': does-not-exist-xyz is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models' If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth", "exception": null, "config": {"detector_model": "does-not-exist-xyz", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+```
+
+#### 9.3 The two logs agree
+
+Produced by `tools/reconcile_check.py::main`. The run records are written by `runlog.py::write` and the audit entries by `audit.py::log_decision` (called from `app.py::submit`). Below: what the tool printed, ending with three decisions, each shown as its run record followed by its audit entry.
+
+```
+sent 40 requests from 8 clients at once in 10.5s; statuses: [200, 400]
+run records per client: [5, 5, 5, 5, 5, 5, 5, 5] (each should be 5)
+
+Three decisions, run record then audit entry, as written:
+{"timestamp": "2026-11-09T02:36:43.290+00:00", "run_id": "24c2d81c526442d98810bf9c768f68b2", "content_id": "195349cf-dc17-45cd-8665-ae988cf796a0", "route": "/submit", "status_code": 200, "outcome": "decided", "creator_id": "recon_20261108183614_c0", "input": {"type": "str", "chars": 681, "words": 84, "preview": "Artificial intelligence is transforming the way organizations operate in the modern world. By leveraging advanced algorithms, businesses can streamline their processes, enhance productivity, and deliver more personalized experiences to their customers. Furthermore, the integration of machine learning into everyday workflows enables teams to make data-driven decisions with greater confidence. It is important to note that responsible adoption requires careful consideration of ethical implications,"}, "output": {"status_code": 200, "guess": "ai", "confidence": 0.2469, "label": "We think this was probably written by AI, or with heavy AI assistance.", "error": null, "message": null}, "duration_ms": 4647.3, "cpu_ms": 11234.4, "model_ms": 4607.2, "style_ms": 0.4, "cold_start": false, "model_score": 0.8162, "style_score": 0.6566, "combined_score": 0.7364, "degraded": false, "degraded_reason": null, "exception": null, "config": {"detector_model": "gpt2", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+{"timestamp": "2026-11-09T02:36:43+00:00", "content_id": "195349cf-dc17-45cd-8665-ae988cf796a0", "creator_id": "recon_20261108183614_c0", "guess": "ai", "model_score": 0.8162, "style_score": 0.6566, "combined_score": 0.7364, "label": "We think this was probably written by AI, or with heavy AI assistance.", "status": "decided"}
+
+{"timestamp": "2026-11-09T02:36:46.026+00:00", "run_id": "1f8af66e76bf48318869ab933a69361f", "content_id": "951acc35-d0e7-450f-b1a1-b3eac1b774be", "route": "/submit", "status_code": 200, "outcome": "decided", "creator_id": "recon_20261108183614_c0", "input": {"type": "str", "chars": 359, "words": 71, "preview": "ok so the bus was late AGAIN and i'm standing there in the drizzle like an idiot, no umbrella, phone at 3%. a woman next to me offers to share hers and we end up talking about her dog (Biscuit, a deaf spaniel, apparently he steals socks?). anyway the 47 finally shows up forty minutes late and she gets off two stops before me. never got her name. wish i had."}, "output": {"status_code": 200, "guess": "human", "confidence": 0.0957, "label": "We think this was probably written by a person.", "error": null, "message": null}, "duration_ms": 2539.4, "cpu_ms": 10078.1, "model_ms": 2533.5, "style_ms": 0.5, "cold_start": false, "model_score": 0.1897, "style_score": 0.4433, "combined_score": 0.3165, "degraded": false, "degraded_reason": null, "exception": null, "config": {"detector_model": "gpt2", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+{"timestamp": "2026-11-09T02:36:46+00:00", "content_id": "951acc35-d0e7-450f-b1a1-b3eac1b774be", "creator_id": "recon_20261108183614_c0", "guess": "human", "model_score": 0.1897, "style_score": 0.4433, "combined_score": 0.3165, "label": "We think this was probably written by a person.", "status": "decided"}
+
+{"timestamp": "2026-11-09T02:36:48.994+00:00", "run_id": "8b0118d609e346299518e375ccca6f37", "content_id": "6354732c-3eb2-414f-bc3e-54b410a24a6c", "route": "/submit", "status_code": 200, "outcome": "decided", "creator_id": "recon_20261108183614_c0", "input": {"type": "str", "chars": 523, "words": 103, "preview": "We got to the campsite about four. The pitch was fine, a bit sloped, but there was a tap nearby and the toilets were clean enough. Putting the tent up took longer than it should have because I had forgotten how the poles went. The weather held until Saturday night. Then it rained hard and kept raining. We stayed in the tent and played cards and ate most of the food we had brought for Sunday. On Sunday we packed up wet and drove home early. It was not the weekend we planned but the kids enjoyed i"}, "output": {"status_code": 200, "guess": "unsure", "confidence": 0.2373, "label": "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation.", "error": null, "message": null}, "duration_ms": 2844.9, "cpu_ms": 11296.9, "model_ms": 2817.0, "style_ms": 0.4, "cold_start": false, "model_score": 0.6175, "style_score": 0.6113, "combined_score": 0.6144, "degraded": false, "degraded_reason": null, "exception": null, "config": {"detector_model": "gpt2", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+{"timestamp": "2026-11-09T02:36:48+00:00", "content_id": "6354732c-3eb2-414f-bc3e-54b410a24a6c", "creator_id": "recon_20261108183614_c0", "guess": "unsure", "model_score": 0.6175, "style_score": 0.6113, "combined_score": 0.6144, "label": "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation.", "status": "decided"}
+
+RESULT records=40/40 malformed=0 agree=24/24
+```
+
+#### 9.4 A writer does not wait long
+
+Produced by `tools/measure_cost.py::main`, with the spread computed by `tools/measure_cost.py::distribution` from `duration_ms` and `cpu_ms` in `logs/runs.jsonl` (`runlog.py::write`). Below: the spread of the 30 warm runs, then the fastest and the slowest run as written.
+
+```
+## Spread of the warm runs
+
+Rebuilt from `logs/runs.jsonl`, runs with `creator_id` `cost_20261108183729_L*warm_*`. The same text was sent every time.
+
+| Measure (ms) | n | Mean | Median | 90th pct | Min | Max |
+|---|---|---|---|---|---|---|
+| Wall (server) | 30 | 491 | 370 | 656 | 231 | 2960 |
+| CPU | 30 | 1352 | 1234 | 2000 | 891 | 2156 |
+
+Slowest warm run was **13x** the fastest on identical input.
+
+Every warm run, in order (wall ms / CPU ms):
+
+- L1warm: 2960/2156 963/2031 546/1203 656/2000 231/891 407/1859 366/1156 375/1234 416/1312 456/1203 420/1469 386/1250 314/1188 356/1281 309/1172 354/1125 360/1172 316/1312 410/1250 333/1188 390/1203 433/1125 298/1453 347/1641 323/1188 326/1516 619/1234 347/1312 378/1203 327/1219
+```
+
+```json
+{"timestamp": "2026-11-09T02:37:48.469+00:00", "run_id": "68a0557a18794164b0ffb0460d414ad9", "content_id": "2ad987b8-798a-44ad-a010-ac53b32a03e4", "route": "/submit", "status_code": 200, "outcome": "decided", "creator_id": "cost_20261108183729_L1warm_0", "input": {"type": "str", "chars": 523, "words": 103, "preview": "We got to the campsite about four. The pitch was fine, a bit sloped, but there was a tap nearby and the toilets were clean enough. Putting the tent up took longer than it should have because I had forgotten how the poles went. The weather held until Saturday night. Then it rained hard and kept raining. We stayed in the tent and played cards and ate most of the food we had brought for Sunday. On Sunday we packed up wet and drove home early. It was not the weekend we planned but the kids enjoyed i"}, "output": {"status_code": 200, "guess": "unsure", "confidence": 0.2373, "label": "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation.", "error": null, "message": null}, "duration_ms": 2960.4, "cpu_ms": 2156.2, "model_ms": 2948.8, "style_ms": 0.6, "cold_start": false, "model_score": 0.6175, "style_score": 0.6113, "combined_score": 0.6144, "degraded": false, "degraded_reason": null, "exception": null, "config": {"detector_model": "gpt2", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+{"timestamp": "2026-11-09T02:37:51.572+00:00", "run_id": "05e351fcb7684ba3bc61ef4ec89f3521", "content_id": "f774471e-9a8f-4faf-8dd7-17806ba02ad3", "route": "/submit", "status_code": 200, "outcome": "decided", "creator_id": "cost_20261108183729_L1warm_4", "input": {"type": "str", "chars": 523, "words": 103, "preview": "We got to the campsite about four. The pitch was fine, a bit sloped, but there was a tap nearby and the toilets were clean enough. Putting the tent up took longer than it should have because I had forgotten how the poles went. The weather held until Saturday night. Then it rained hard and kept raining. We stayed in the tent and played cards and ate most of the food we had brought for Sunday. On Sunday we packed up wet and drove home early. It was not the weekend we planned but the kids enjoyed i"}, "output": {"status_code": 200, "guess": "unsure", "confidence": 0.2373, "label": "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation.", "error": null, "message": null}, "duration_ms": 231.4, "cpu_ms": 890.6, "model_ms": 229.0, "style_ms": 0.3, "cold_start": false, "model_score": 0.6175, "style_score": 0.6113, "combined_score": 0.6144, "degraded": false, "degraded_reason": null, "exception": null, "config": {"detector_model": "gpt2", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+```
+
+#### 9.5 Plain human writing is not accused
+
+Produced by `run_attacks.py::main`, which sends each text to `app.py::submit`; the label comes from `scoring.py::score_to_label`. Below: the eight false-positive rows of the report it wrote (`results\attack_run_2026-11-08_1836_unit9_run1.md`).
+
+| ID | Family | Targeting | Status | Content ID | Guess | Score | Verdict |
+|---|---|---|---|---|---|---|---|
+| FP01 | false_positive | plain, clear human writing with no flourishes | 200 | `399779ec-2629-48da-91c5-c4ff1773793d` | unsure | 0.237 |  |
+| FP02 | false_positive | human writing in a formal register | 200 | `d7778572-c39b-4bae-8450-bf4d48fc58a3` | ai | 0.174 |  |
+| FP03 | false_positive | a non-native English speaker writing carefully | 200 | `90fa4ecc-54d6-4666-913c-2c52394297ae` | ai | 0.221 |  |
+| FP04 | false_positive | a student essay written to a rubric | 200 | `c67dd98d-2fd0-43bf-a939-63f1f0a29b39` | ai | 0.202 |  |
+| FP05 | false_positive | technical documentation written by a person | 200 | `940b0c75-1516-4ac9-bf95-59f4af7d4a03` | ai | 0.304 |  |
+| FP06 | false_positive | a person imitating a formal template | 200 | `a6d17d41-7c78-411d-8770-f3c023fefbe1` | ai | 0.234 |  |
+| FP07 | false_positive | human writing that repeats a phrase deliberately | 200 | `e0821d7e-e16e-4a6e-bf22-bb3a6569e001` | ai | 0.265 |  |
+| FP08 | false_positive | very short genuine human submission | 200 | `e6854e7b-d7f4-46f9-95f9-f662e7c8c054` | unsure | 0.482 |  |
+
+#### 9.2 again, after the improvement (run 1 of the after set)
+
+Produced by `tools/degraded_check.py::main` against a server started with `AI201_DETECTOR_MODEL=does-not-exist-xyz`. The fallback is `app.py::submit` calling `scoring.py::label_without_model`; the timings are `duration_ms` in the records `runlog.py::write` appended to `logs/runs.jsonl`. Below: what the tool printed, then the first request, the median request and the last request of the 30, as written.
+
+```
+trial 1: 10/10 behaved as 'degraded'
+
+trial 2: 10/10 behaved as 'degraded'
+
+trial 3: 10/10 behaved as 'degraded'
+```
+
+```json
+{"timestamp": "2026-11-09T03:06:18.001+00:00", "run_id": "2afabf654af94f75b34ee816adb0986b", "content_id": "4f646cf1-f884-4678-8758-beb689ffc9ee", "route": "/submit", "status_code": 200, "outcome": "degraded", "creator_id": "degraded_degraded_u9afterr1t190555_t1_1", "input": {"type": "str", "chars": 681, "words": 84, "preview": "Artificial intelligence is transforming the way organizations operate in the modern world. By leveraging advanced algorithms, businesses can streamline their processes, enhance productivity, and deliver more personalized experiences to their customers. Furthermore, the integration of machine learning into everyday workflows enables teams to make data-driven decisions with greater confidence. It is important to note that responsible adoption requires careful consideration of ethical implications,"}, "output": {"status_code": 200, "guess": "unsure", "confidence": 0.0, "label": "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation. Only part of our check could run, so this is less certain than usual.", "error": null, "message": null}, "duration_ms": 545.1, "cpu_ms": 328.1, "model_ms": 532.7, "style_ms": 1.4, "cold_start": true, "model_score": null, "style_score": 0.6566, "combined_score": 0.6566, "degraded": true, "degraded_reason": "DetectorUnavailable: Couldn't load 'does-not-exist-xyz': does-not-exist-xyz is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models' If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth", "exception": null, "config": {"detector_model": "does-not-exist-xyz", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+{"timestamp": "2026-11-09T03:06:26.973+00:00", "run_id": "dd023f4e900a41d78ca7186cc523f02a", "content_id": "d7d54833-17e5-407a-ac26-49eb0527069d", "route": "/submit", "status_code": 200, "outcome": "degraded", "creator_id": "degraded_degraded_u9afterr1t190555_t2_7", "input": {"type": "str", "chars": 60, "words": 12, "preview": "We missed the last train, so we walked home along the canal."}, "output": {"status_code": 200, "guess": "unsure", "confidence": 0.0, "label": "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation. Only part of our check could run, so this is less certain than usual.", "error": null, "message": null}, "duration_ms": 465.3, "cpu_ms": 312.5, "model_ms": 462.9, "style_ms": 0.1, "cold_start": true, "model_score": null, "style_score": 0.7222, "combined_score": 0.7222, "degraded": true, "degraded_reason": "DetectorUnavailable: Couldn't load 'does-not-exist-xyz': does-not-exist-xyz is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models' If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth", "exception": null, "config": {"detector_model": "does-not-exist-xyz", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+{"timestamp": "2026-11-09T03:06:33.741+00:00", "run_id": "7ef2e90f972445998a91e7e6afc1babf", "content_id": "2f4b8a3f-ee55-4c4f-8201-4583e41a5078", "route": "/submit", "status_code": 200, "outcome": "degraded", "creator_id": "degraded_degraded_u9afterr1t190555_t3_10", "input": {"type": "str", "chars": 62, "words": 13, "preview": "I still have the first letter she sent me, folded in a drawer."}, "output": {"status_code": 200, "guess": "unsure", "confidence": 0.0, "label": "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation. Only part of our check could run, so this is less certain than usual.", "error": null, "message": null}, "duration_ms": 405.4, "cpu_ms": 281.2, "model_ms": 403.1, "style_ms": 0.0, "cold_start": true, "model_score": null, "style_score": 0.6667, "combined_score": 0.6667, "degraded": true, "degraded_reason": "DetectorUnavailable: Couldn't load 'does-not-exist-xyz': does-not-exist-xyz is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models' If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth", "exception": null, "config": {"detector_model": "does-not-exist-xyz", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
+```
+
 
 <!-- ═════════════════════════════════════════════════════════════════════
 

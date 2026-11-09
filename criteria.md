@@ -319,6 +319,12 @@ launch and 30 warm runs of one text, with nothing else running. The 90th
 percentiles are read from `duration_ms` and `cpu_ms` in `logs/runs.jsonl`. Thirty
 is the fewest runs for which a 90th percentile is more than a single data point.
 
+*Result, added later:* it held in all six unit 9 runs (90th percentile 0.5 to 1.5 s
+wall and 1.4 to 2.0 s CPU), so it is MET. That is not what the "known to fail"
+paragraph above predicted. That paragraph describes the first measurement, whose
+slow tail did not reproduce. I believe it was the machine, but I did not identify
+what else was running, so the prediction above is left as written.
+
 **Known to fail when written.** The 30-run measurement on this machine
 (`results/cost_2026-11-08_1812.md`) gave a median of 2.6 s but a 90th percentile
 of 20.9 s wall and 5.2 s CPU, with the slowest run 35 times the fastest on
@@ -366,8 +372,9 @@ against a running service. The number is how many of FP01 to FP08 come back as
 `ai`, taken from the report it writes.
 
 All five are run, three separate times from scratch, by `python
-tools/run_unit9.py`, which saves every step's output and fills in the run log at
-`results/unit9_run_log.md`.
+tools/run_unit9.py`, which saves every step's output and fills in the run log. The
+set was run twice, with `--label before` and `--label after`, and the logs are
+`results/unit9_run_log_before.md` and `results/unit9_run_log_after.md`.
 
 **Known to fail when written.** In the 2026-11-08 regression attack run, 6 of
 the 8 (FP02 to FP07) come back as AI; only FP01 and FP08 are held at "unsure".

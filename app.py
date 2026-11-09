@@ -24,6 +24,7 @@ Routes:
     GET  /health      is the service up, and is the model loaded
 """
 
+import os
 import re
 import time
 import traceback
@@ -497,6 +498,12 @@ def main():
     print('    -H "Content-Type: application/json" \\')
     print("    -d '{\"message\": \"hello\"}'")
     print()
+    # Debug mode runs this function twice (the reloader starts a child process
+    # that runs it again), so only the child does the slow imports.
+    if config.PRELOAD_LIBRARIES and (not config.DEBUG or os.environ.get("WERKZEUG_RUN_MAIN") == "true"):
+        import detector
+        print("Loading torch and transformers (10 to 15 seconds) so the first request is not slow ...", flush=True)
+        detector.preload_libraries()
     # debug=True hands out an interactive debugger, so it's local-only — see config.py
     app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG)
 
