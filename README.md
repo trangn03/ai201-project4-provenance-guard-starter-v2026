@@ -378,6 +378,18 @@ $ curl "http://127.0.0.1:5000/log?limit=2"
   diffing the two attack reports: 50 of 56 rows are identical, and the six that
   changed are exactly the rejected inputs.
 
+**Moment 7: a wrong number that matched too well**
+
+- *What I asked for:* the five criteria run three separate times with the real output saved, then one improvement and the whole set run again, three trials, in the same format.
+- *What came back:* a script (`tools/run_unit9.py`) and, for the first attempt at the "after" set, a table whose 9.2 cell for run 1 read "median 0.5 s, max 13.5 s". That is the same maximum as the "before" set, to the digit, which would have said the fix did nothing.
+- *What changed:* the AI did not accept it. It stopped the run and counted the records behind the number: 60 shared the request-name prefix `degraded_degraded_u9r1_` instead of 30, because both sets had named their requests the same way and the lookup returned both sets mixed together. Separated by time, the new 30 were fast (first request 1.5 s, slowest 2.1 s), so the 13.5 s was the old set's slowest request. The names now carry the set's label and the time, the partial output of the aborted run was deleted, and the whole "after" set was run again (9.2 maximum 0.6, 1.0 and 1.0 s). The "before" set was not affected, since each of its runs has exactly 30 records, and the README's Run Log says all of this, because a wrong table that looked right is worth knowing about.
+
+**Moment 8: a number I led with, then replaced**
+
+- *What I asked for:* the cost of one run, run ten times and averaged, with how it was measured ("a number from the pricing page isn't a measurement").
+- *What came back:* `tools/measure_cost.py` and a mean of 5.28 s of wall time and 2.39 s of CPU per warm run, from 30 runs. The same report showed the individual runs, 0.66 s to 23 s on identical input, and the AI said no single figure was "the cost" and that it did not know what was slowing the machine. It also wrote, in `criteria.md`, that 9.4 (90% of warm runs within 5 s) was "known to fail".
+- *What changed:* I did not lead with that mean in the end. Six more 30-run measurements, with nothing else running, gave a 90th percentile of 0.5 to 1.5 s and passed 9.4 every time, so the prediction was wrong and the first measurement's slow tail was most likely the machine. The headline became the pooled mean of those 180 runs (0.50 s wall, 1.32 s CPU), the 100-people-a-day arithmetic was built on that, and the first measurement stayed in the README with its caveats and as the busy-machine case. The wrong prediction was not edited out: a "Result, added later" note sits under 9.4 in `criteria.md`, and two README sentences that still repeated it were corrected.
+
 <!-- ═══════════════════════ UNIT 8, THE TEST ═══════════════════════ -->
 
 ---
@@ -1033,9 +1045,8 @@ I am extending this system with **Shape B, harden against failure**. Everything 
 
 Three things I thought about doing and decided not to, so the unit stays about the failure path:
 
-- **I am not fixing the accuracy problems listed in What's Still Broken.** That means no change to `AI_THRESHOLD`, the signal weights, the combining rule's disagreement pull, or the MF07 script check I said I would do first on a real deployment. Those are about the service being wrong when it works, and Shape B is about what it does when it breaks. They would also move the numbers the rest of this README justifies, and I would have to redo the before and after runs to defend them.
-- **I am not swapping `gpt2` for a smaller model, or adding a third signal, to make failures rarer.** A lighter model would fail less often, but the perplexity midpoint in `detector.py` (currently 45) was set for `gpt2`, so a different model would change every score. The aim is a service that fails safely, not one that fails less because the signal underneath it changed.
-- **I am not putting the service on a host or changing how it logs.** It stays on Path B, started by `python app.py`, with `logs/audit.jsonl` as the only record. I am not adding a database, a queue, or retries for a model that is missing or out of memory, because retrying a failure like that gives the same result and only delays the answer.
+- **I am not changing how a run is scored.** That means no change to `AI_THRESHOLD`, the signal weights, the combining rule's disagreement pull, or the MF07 script check I said I would do first on a real deployment, and no swapping `gpt2` for a smaller model or adding a third signal to make failures rarer. Those are about the service being wrong when it works, and Shape B is about what it does when it breaks. They would also move every number the rest of this README justifies: the perplexity midpoint in `detector.py` (currently 45) was set for `gpt2`, so a different model would change every score, and I would have to redo the before and after runs to defend any of it. (Later in the unit I did fix one miss, the slow first request, by changing *when* the libraries load and not *what* a run scores. The false positives, criterion 9.5, I left alone for the reasons given here.)
+- **I am not putting the service on a host, or building infrastructure around it.** It stays on Path B, started by `python app.py`, with its record in `logs/`. I am not replacing the JSON-lines logs with a database, adding a queue, or retrying a model that is missing or out of memory, because retrying a failure like that gives the same result and only delays the answer. (The run log, `logs/runs.jsonl`, was added later in the unit as instrumentation: a second file beside `audit.jsonl`, not a change to it.)
 - **I am not adding a timeout for a model call that hangs.** Python cannot stop a thread that is busy inside `torch`, so a timeout would return to the caller while the stuck call kept using the CPU, and getting that right is more building than this unit has room for. The failures I do handle are the ones that raise an error: a missing model, an out-of-memory error, a load that fails.
 
 ---
