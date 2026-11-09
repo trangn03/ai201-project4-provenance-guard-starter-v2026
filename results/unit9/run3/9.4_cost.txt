@@ -1,0 +1,53 @@
+$ python tools/measure_cost.py --launches 1 --runs 30 --no-lengths
+(exit code 0, 42s)
+
+launch 1: startup 1.6s, cold run 13.1s, warm mean 806 ms (n=30)
+
+# Cost of one run - measured 2026-11-08 18:41
+
+This system calls no paid API and uses no tokens. The cost of a run is compute on the local machine: wall time, CPU time and memory.
+
+## How it was measured
+
+- `python tools/measure_cost.py --launches 1 --runs 30` (Python 3.11.9, win32, model `gpt2`, `DETECTOR_MAX_TOKENS` 400).
+- Each launch starts a fresh server, so the first request is a true cold start. It is timed alone. 30 warm runs of one fixed 103-word text follow, one at a time, each under its own `creator_id`.
+- Client time is `perf_counter` around the HTTP call. Wall duration, CPU time and per-signal time come from the service's own run record in `logs/runs.jsonl` (`duration_ms`, `cpu_ms`, `model_ms`, `style_ms`), matched by `creator_id`.
+- `cpu_ms` is process-wide CPU time over the request (`time.process_time`), valid because requests were sent one at a time. It can exceed wall time because torch uses several cores.
+- Memory is the working set of the listening process from `tasklist`, before and after the cold run.
+
+## Cold start (first run after launch)
+
+| Launch | Server up (s) | Cold run, client (s) | Cold run CPU (s) | Memory before -> after (MB) |
+|---|---|---|---|---|
+| 1 | 1.6 | 13.1 | 11.1 | 42 -> 896 |
+
+Mean cold run: **13.1 s** over 1 launches.
+
+## Warm runs (milliseconds, mean unless noted)
+
+| Set | Client | Wall (server) | CPU | Model signal | Style signal | Client min-max |
+|---|---|---|---|---|---|---|
+| Launch 1, medium, n=30 | 806 | 787 | 1355 | 777 | 0.7 | 388-2879 |
+| **All launches, medium, n=30** | 806 | 787 | 1355 | 777 | 0.7 | 388-2879 |
+
+**One warm run costs about 0.79 s of wall time and 1.35 s of CPU** (mean of 30). 99% of it is the model signal; the style signal is 0.7 ms.
+
+
+## Spread of the warm runs
+
+Rebuilt from `logs/runs.jsonl`, runs with `creator_id` `cost_20261108184040_L*warm_*`. The same text was sent every time.
+
+| Measure (ms) | n | Mean | Median | 90th pct | Min | Max |
+|---|---|---|---|---|---|---|
+| Wall (server) | 30 | 787 | 563 | 1456 | 382 | 2864 |
+| CPU | 30 | 1355 | 1289 | 1734 | 1031 | 2172 |
+
+Slowest warm run was **7x** the fastest on identical input.
+
+Every warm run, in order (wall ms / CPU ms):
+
+- L1warm: 1086/1484 1726/1453 1456/1734 1184/2172 1233/1422 1117/1703 541/1266 666/1125 586/1453 612/1250 961/1438 446/1266 744/1422 775/1109 506/1312 443/1094 382/1203 538/1219 540/1328 496/1062 455/1406 516/1109 430/1219 688/1453 826/1531 2864/1859 532/1156 449/1031 424/1188 391/1172
+
+run stamp: 20261108184040
+
+Wrote C:\Users\xtran\Downloads\ai201-project4-provenance-guard-starter-v2026\results\cost_2026-11-08_1841.md

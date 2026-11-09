@@ -242,6 +242,12 @@ because this machine's timings varied 35-fold on identical input, so a tighter
 maximum would mostly measure the laptop, and any miss has to be diagnosed as
 the code or the machine before it counts.
 
+*How it is run:* start the service with `AI201_DETECTOR_MODEL=does-not-exist-xyz`
+so the model really cannot load, then `python tools/degraded_check.py --expect
+degraded --trials 3`: 3 trials of 10 requests, so 30 durations, from a freshly
+started server each time so the slow first request is included. Median and
+maximum are read from `duration_ms` in `logs/runs.jsonl`.
+
 ---
 
 ## 9.3 The two logs agree
@@ -308,6 +314,11 @@ them an accusation. That is why this one is a percentile with room in it and
 what a host would meter: 3 seconds is about 1.5 times the measured median of
 1.9 seconds.
 
+*How it is run:* `python tools/measure_cost.py --launches 1 --runs 30`: a fresh
+launch and 30 warm runs of one text, with nothing else running. The 90th
+percentiles are read from `duration_ms` and `cpu_ms` in `logs/runs.jsonl`. Thirty
+is the fewest runs for which a 90th percentile is more than a single data point.
+
 **Known to fail when written.** The 30-run measurement on this machine
 (`results/cost_2026-11-08_1812.md`) gave a median of 2.6 s but a 90th percentile
 of 20.9 s wall and 5.2 s CPU, with the slowest run 35 times the fastest on
@@ -349,6 +360,14 @@ four on this kind of writing. It is the strictest number I can defend without
 losing the AI label, not one I consider acceptable. It is a count out of 8
 rather than a percentage because 8 texts cannot support a rate, and each of
 them is a person.
+
+*How it is run:* `python run_attacks.py --set attack_set --family false_positive`
+against a running service. The number is how many of FP01 to FP08 come back as
+`ai`, taken from the report it writes.
+
+All five are run, three separate times from scratch, by `python
+tools/run_unit9.py`, which saves every step's output and fills in the run log at
+`results/unit9_run_log.md`.
 
 **Known to fail when written.** In the 2026-11-08 regression attack run, 6 of
 the 8 (FP02 to FP07) come back as AI; only FP01 and FP08 are held at "unsure".

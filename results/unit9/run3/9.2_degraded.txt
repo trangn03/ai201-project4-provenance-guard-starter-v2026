@@ -1,0 +1,6 @@
+$ python tools/degraded_check.py --expect degraded --trials 3 --tag u9r3 --url http://127.0.0.1:5007
+(exit code 0, 26s)
+
+trial 1: 10/10 behaved as 'degraded'
+trial 2: 10/10 behaved as 'degraded'
+trial 3: 10/10 behaved as 'degraded'
