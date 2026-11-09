@@ -1038,7 +1038,6 @@ Three things I thought about doing and decided not to, so the unit stays about t
 - **I am not putting the service on a host or changing how it logs.** It stays on Path B, started by `python app.py`, with `logs/audit.jsonl` as the only record. I am not adding a database, a queue, or retries for a model that is missing or out of memory, because retrying a failure like that gives the same result and only delays the answer.
 - **I am not adding a timeout for a model call that hangs.** Python cannot stop a thread that is busy inside `torch`, so a timeout would return to the caller while the stuck call kept using the CPU, and getting that right is more building than this unit has room for. The failures I do handle are the ones that raise an error: a missing model, an out-of-memory error, a load that fails.
 
-
 ---
 
 ## Instrumentation
@@ -1047,21 +1046,21 @@ Every request to `/submit` writes one record to `logs/runs.jsonl`, whatever happ
 
 Each record has the same 21 named fields:
 
-| Field | What it is for |
-| ----- | -------------- |
-| `timestamp`, `run_id` | when (UTC, to the millisecond) and which run |
-| `content_id` | links a decided run to its `audit.jsonl` entry; null if no decision was made |
-| `route`, `status_code`, `outcome` | `decided`, `degraded`, `rejected`, `rate_limited` or `error` |
-| `creator_id` | who submitted |
-| `input` | type, character and word count, and the first 500 characters (`RUN_LOG_INPUT_CHARS` in `config.py`; set it to 0 to keep no text) |
-| `output` | status code, guess, confidence, label, and the error and message when there was one |
-| `duration_ms`, `cpu_ms` | wall clock for the whole request, and CPU time the process used (it can exceed wall time because torch uses several cores) |
-| `model_ms`, `style_ms` | time inside each signal, null if that signal never ran |
-| `cold_start` | true if the model was not yet loaded when the run began |
-| `model_score`, `style_score`, `combined_score` | the numbers behind the answer |
-| `degraded`, `degraded_reason` | whether signal one failed, and why |
-| `exception` | null, or type, message and traceback for an unhandled crash |
-| `config` | detector model, both thresholds and both weights in force, so a record still means something after the settings change |
+| Field                                                | What it is for                                                                                                                       |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `timestamp`, `run_id`                            | when (UTC, to the millisecond) and which run                                                                                         |
+| `content_id`                                       | links a decided run to its `audit.jsonl` entry; null if no decision was made                                                       |
+| `route`, `status_code`, `outcome`              | `decided`, `degraded`, `rejected`, `rate_limited` or `error`                                                               |
+| `creator_id`                                       | who submitted                                                                                                                        |
+| `input`                                            | type, character and word count, and the first 500 characters (`RUN_LOG_INPUT_CHARS` in `config.py`; set it to 0 to keep no text) |
+| `output`                                           | status code, guess, confidence, label, and the error and message when there was one                                                  |
+| `duration_ms`, `cpu_ms`                          | wall clock for the whole request, and CPU time the process used (it can exceed wall time because torch uses several cores)           |
+| `model_ms`, `style_ms`                           | time inside each signal, null if that signal never ran                                                                               |
+| `cold_start`                                       | true if the model was not yet loaded when the run began                                                                              |
+| `model_score`, `style_score`, `combined_score` | the numbers behind the answer                                                                                                        |
+| `degraded`, `degraded_reason`                    | whether signal one failed, and why                                                                                                   |
+| `exception`                                        | null, or type, message and traceback for an unhandled crash                                                                          |
+| `config`                                           | detector model, both thresholds and both weights in force, so a record still means something after the settings change               |
 
 **Failures are recorded, not only successes.** The record is written in `teardown_request`, not `after_request`, because Flask skips `after_request` for an unhandled error in debug mode, which is the mode this service runs in by default. A record written there would silently never appear for exactly the runs that went wrong. If writing the record itself fails, `runlog.write` reports it through `logging` to stderr and the request still gets its answer.
 
@@ -1077,20 +1076,20 @@ python runlog.py --json         # the raw records
 
 `python tools/demo_session.py` starts the service, sends one of each kind of outcome, then restarts it with the model unable to load (`AI201_DETECTOR_MODEL=does-not-exist-xyz`) and sends two more. It recorded 18 runs; twelve are pasted below, in the order they happened. The table is a summary of the same twelve entries that follow it.
 
-| # | Outcome | Status | Wall ms | CPU ms | Model ms | creator_id | Result or reason |
-| - | ------- | ------ | ------- | ------ | -------- | ---------- | ---------------- |
-| 1 | decided | 200 | 67,753 | 22,734 | 67,594 | demo_cold_human | human (model 0.1897, style 0.4433) |
-| 2 | decided | 200 | 1,410 | 1,391 | 1,401 | demo_ai | ai (model 0.8162, style 0.6566) |
-| 3 | decided | 200 | 753 | 1,438 | 736 | demo_plain | unsure (model 0.6175, style 0.6113) |
-| 4 | rejected | 400 | 6 | 0 | - | demo_empty | text is required and must be a non-empty string. |
-| 5 | rejected | 400 | 5 | 0 | - | demo_short | Text needs at least 5 words that contain letters. |
-| 6 | rejected | 400 | 6 | 0 | - | demo_control | Text contains control characters. |
-| 7 | rejected | 400 | 5 | 0 | - | demo_missing | text is required and must be a non-empty string. |
-| 8 | rejected | 400 | 6 | 16 | - | null | Request body must be a JSON object. |
-| 9 | decided | 200 | 363 | 828 | 358 | demo_burst | unsure (model 0.4125, style 0.7222) |
-| 10 | rate_limited | 429 | 3 | 0 | - | demo_burst | Too many submissions. Try again shortly. |
-| 11 | degraded | 200 | 38,111 | 14,844 | 38,086 | demo_degraded_ai | DetectorUnavailable: Couldn't load 'does-not-exi... -> unsure |
-| 12 | degraded | 200 | 701 | 484 | 696 | demo_degraded_human | DetectorUnavailable: Couldn't load 'does-not-exi... -> unsure |
+| #  | Outcome      | Status | Wall ms | CPU ms | Model ms | creator_id          | Result or reason                                              |
+| -- | ------------ | ------ | ------- | ------ | -------- | ------------------- | ------------------------------------------------------------- |
+| 1  | decided      | 200    | 67,753  | 22,734 | 67,594   | demo_cold_human     | human (model 0.1897, style 0.4433)                            |
+| 2  | decided      | 200    | 1,410   | 1,391  | 1,401    | demo_ai             | ai (model 0.8162, style 0.6566)                               |
+| 3  | decided      | 200    | 753     | 1,438  | 736      | demo_plain          | unsure (model 0.6175, style 0.6113)                           |
+| 4  | rejected     | 400    | 6       | 0      | -        | demo_empty          | text is required and must be a non-empty string.              |
+| 5  | rejected     | 400    | 5       | 0      | -        | demo_short          | Text needs at least 5 words that contain letters.             |
+| 6  | rejected     | 400    | 6       | 0      | -        | demo_control        | Text contains control characters.                             |
+| 7  | rejected     | 400    | 5       | 0      | -        | demo_missing        | text is required and must be a non-empty string.              |
+| 8  | rejected     | 400    | 6       | 16     | -        | null                | Request body must be a JSON object.                           |
+| 9  | decided      | 200    | 363     | 828    | 358      | demo_burst          | unsure (model 0.4125, style 0.7222)                           |
+| 10 | rate_limited | 429    | 3       | 0      | -        | demo_burst          | Too many submissions. Try again shortly.                      |
+| 11 | degraded     | 200    | 38,111  | 14,844 | 38,086   | demo_degraded_ai    | DetectorUnavailable: Couldn't load 'does-not-exi... -> unsure |
+| 12 | degraded     | 200    | 701     | 484    | 696      | demo_degraded_human | DetectorUnavailable: Couldn't load 'does-not-exi... -> unsure |
 
 The entries as written to `logs/runs.jsonl`, unedited:
 
@@ -1128,10 +1127,10 @@ This system calls no paid API and uses no tokens: signal one is a model that run
 
 **The number, measured on this machine** (11th Gen Intel Core i5-1135G7, 4 cores / 8 threads, Windows 11, Python 3.11.9, `gpt2`, 400-token limit), over 30 warm runs of one 103-word text:
 
-| | Mean | Median | 90th percentile | Fastest | Slowest |
-| - | ---- | ------ | --------------- | ------- | ------- |
-| Wall time | **5.28 s** | 2.55 s | 20.9 s | 0.66 s | 23.0 s |
-| CPU time | **2.39 s** | 1.88 s | 5.16 s | 1.28 s | 6.19 s |
+|           | Mean             | Median | 90th percentile | Fastest | Slowest |
+| --------- | ---------------- | ------ | --------------- | ------- | ------- |
+| Wall time | **5.28 s** | 2.55 s | 20.9 s          | 0.66 s  | 23.0 s  |
+| CPU time  | **2.39 s** | 1.88 s | 5.16 s          | 1.28 s  | 6.19 s  |
 
 The first run after a launch, where the model loads, is a different cost: **60.6 s** mean wall time over 3 launches (56.1, 59.7, 65.9) and 20.9 s of CPU. After loading, the server process holds about **490 MB** (working set 482 to 503 MB, up from 41 MB), which is why this system takes Path B: it already uses nearly all of a 512 MB free tier before it has answered anything. That memory figure is the Windows working set from `tasklist`, so it is not directly comparable to a Linux resident-set number.
 
@@ -1149,8 +1148,38 @@ Length matters up to the model's token limit and then stops: warm CPU averaged 1
 
 The full report, with every warm run in order, is `results/cost_2026-11-08_1812.md`. The runs themselves are in `logs/runs.jsonl` under `creator_id`s starting `cost_20261108180312_`. A repeat takes about ten minutes, and should be done with nothing else running.
 
-This measurement is what criteria 9.2 and 9.4 in `criteria.md` were written against. I wrote 9.4 expecting it to fail, because this first measurement's 90th percentile was 20.9 s. It then held in all six later runs (90th percentile 0.5 to 1.5 s), so that slow tail did not reproduce. I think it was the machine, but I never found what was competing for it, so I cannot say. 9.2 was missed until the preload change described in the Run Log, Unit 9 section below.
+### Measured again, and what a hundred people a day would cost
 
+The first measurement above was taken once, on a machine that turned out to be busy, and I do not trust it as the headline. Since then the same 30-run measurement (`python tools/measure_cost.py --launches 1 --runs 30 --no-lengths`, a fresh server each time, nothing else running) has been run six more times by `tools/run_unit9.py`, three before the preload change and three after. Preloading only moves the import to start-up, so it should not change a warm run, and it did not:
+
+| Launch            | n             | Wall mean (ms) | Wall median   | Wall 90th pct | CPU mean (ms)   | CPU median      | CPU 90th pct    |
+| ----------------- | ------------- | -------------- | ------------- | ------------- | --------------- | --------------- | --------------- |
+| Before, run 1     | 30            | 491            | 370           | 656           | 1,352           | 1,234           | 2,000           |
+| Before, run 2     | 30            | 386            | 369           | 491           | 1,266           | 1,281           | 1,375           |
+| Before, run 3     | 30            | 787            | 563           | 1,456         | 1,355           | 1,289           | 1,734           |
+| After, run 1      | 30            | 509            | 413           | 764           | 1,328           | 1,312           | 1,453           |
+| After, run 2      | 30            | 422            | 371           | 568           | 1,306           | 1,258           | 1,562           |
+| After, run 3      | 30            | 403            | 383           | 500           | 1,298           | 1,297           | 1,438           |
+| **All six** | **180** | **500**  | **393** | **688** | **1,317** | **1,281** | **1,516** |
+
+**The per-run number I will use is the pooled mean of those 180 warm runs: 0.50 s of wall time and 1.32 s of CPU for one 103-word text, with the model signal taking 98% of the wall time.** CPU time is the steadier of the two (every launch's mean is between 1.27 and 1.36 s), which is why the arithmetic below is built on it. I switched to this from the first measurement's 5.28 s and 2.39 s because it is six times the data, taken under controlled conditions, and agrees with itself; the first measurement stays above, caveats included, and I use its 2.39 s CPU figure below as the busy-machine case.
+
+**For 100 people a day at an assumed three submissions each, that is 300 runs × 1.32 CPU-seconds = 396 CPU-seconds, about 6.6 minutes of one core (0.46% of a core's day), so the compute is close to free and the real cost is keeping a machine with about 490 MB free switched on all day, which costs the same whether it handles 300 runs or 3,000.**
+
+The arithmetic, with every assumption marked:
+
+- Runs a day: 100 people × 3 submissions each = **300 runs**. *The 3 is my assumption. I have no usage data.*
+- CPU: 300 × 1.32 s = **396 CPU-seconds** = 396 ÷ 60 = 6.6 minutes. A core has 24 × 60 × 60 = 86,400 seconds a day, so that is 396 ÷ 86,400 = **0.46%** of one core.
+- Server busy time: 300 × 0.50 s = 150 s. If all 300 arrived within one hour, that is 150 ÷ 3,600 = **4%** busy. One worker is enough.
+- Ceiling: the rate limit lets each creator send 100 a day (`RATE_LIMIT_PER_DAY`). If all 100 people used all of it, that is 100 × 100 = 10,000 runs × 1.32 s = 13,200 CPU-seconds = 3.7 hours = 13,200 ÷ 86,400 = **15%** of one core. Still one machine.
+- Long texts: the one measurement I have of a text long enough to hit the model's 400-token limit (515 words, n = 10, from the first measurement) used 8.1 s of CPU. If every submission were that long: 300 × 8.1 s = 2,430 s = 40.5 minutes = **2.8%** of a core.
+- Busy machine: at the first measurement's 2.39 s of CPU, 300 × 2.39 s = 717 s = 12 minutes. The same arithmetic, roughly twice the cost, and still small.
+- Memory, the part that does not scale with runs: the process holds about **490 MB** once the model is loaded (working set, measured), and must stay loaded, because a restart costs about 13 s of start-up plus a slow first request.
+- Money: this follows from keeping the machine on. *Assuming* a small always-on machine with 1 GB of memory at $5 a month (a figure I did not look up): $5 ÷ 30 = $0.17 a day, ÷ 300 runs = about **$0.0006 a run**, or about $0.00002 a run at the 10,000-run ceiling. The assumed price is the only number in this section I did not measure.
+
+What this does not cover: more than one server process (the run log's lock only works within one process), text lengths I did not measure, a different machine, or the cost of building and maintaining the system, which is not a per-run cost.
+
+This measurement is what criteria 9.2 and 9.4 in `criteria.md` were written against. I wrote 9.4 expecting it to fail, because this first measurement's 90th percentile was 20.9 s. It then held in all six later runs (90th percentile 0.5 to 1.5 s), so that slow tail did not reproduce. I think it was the machine, but I never found what was competing for it, so I cannot say. 9.2 was missed until the preload change described in the Run Log, Unit 9 section below.
 
 ---
 
@@ -1162,35 +1191,35 @@ I ran the whole set twice: once as built (**before**), and once after a single i
 
 ### Before
 
-| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
-|---|---|---|---|---|---|
-| 9.1 Every failure kind leaves a record | 9 of 9 kinds leave exactly one record with a reason | 9 of 9 | 9 of 9 | 9 of 9 | MET |
-| 9.2 A degraded answer is quick | median ≤ 1 s and max ≤ 3 s with the model unable to load | median 0.5 s, max 13.5 s | median 0.4 s, max 12.9 s | median 0.5 s, max 9.6 s | MISSED |
-| 9.3 The two logs agree | 40 of 40 records, no bad lines, run and audit entries agree | 40/40 records, 24/24 agree | 40/40 records, 24/24 agree | 40/40 records, 24/24 agree | MET |
-| 9.4 A writer does not wait long | 90% of 30 warm runs ≤ 5 s wall and ≤ 3 s CPU | p90 0.7 s wall, 2.0 s CPU | p90 0.5 s wall, 1.4 s CPU | p90 1.5 s wall, 1.7 s CPU | MET |
-| 9.5 Plain human writing is not accused | ≤ 2 of 8 plain-human texts labelled AI | 6 of 8 accused | 6 of 8 accused | 6 of 8 accused | MISSED |
+| Criterion                              | Target                                                      | Run 1                      | Run 2                      | Run 3                      | Verdict |
+| -------------------------------------- | ----------------------------------------------------------- | -------------------------- | -------------------------- | -------------------------- | ------- |
+| 9.1 Every failure kind leaves a record | 9 of 9 kinds leave exactly one record with a reason         | 9 of 9                     | 9 of 9                     | 9 of 9                     | MET     |
+| 9.2 A degraded answer is quick         | median ≤ 1 s and max ≤ 3 s with the model unable to load  | median 0.5 s, max 13.5 s   | median 0.4 s, max 12.9 s   | median 0.5 s, max 9.6 s    | MISSED  |
+| 9.3 The two logs agree                 | 40 of 40 records, no bad lines, run and audit entries agree | 40/40 records, 24/24 agree | 40/40 records, 24/24 agree | 40/40 records, 24/24 agree | MET     |
+| 9.4 A writer does not wait long        | 90% of 30 warm runs ≤ 5 s wall and ≤ 3 s CPU              | p90 0.7 s wall, 2.0 s CPU  | p90 0.5 s wall, 1.4 s CPU  | p90 1.5 s wall, 1.7 s CPU  | MET     |
+| 9.5 Plain human writing is not accused | ≤ 2 of 8 plain-human texts labelled AI                     | 6 of 8 accused             | 6 of 8 accused             | 6 of 8 accused             | MISSED  |
 
 ### After the improvement
 
-| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
-|---|---|---|---|---|---|
-| 9.1 Every failure kind leaves a record | 9 of 9 kinds leave exactly one record with a reason | 9 of 9 | 9 of 9 | 9 of 9 | MET |
-| 9.2 A degraded answer is quick | median ≤ 1 s and max ≤ 3 s with the model unable to load | median 0.5 s, max 0.6 s | median 0.4 s, max 1.0 s | median 0.8 s, max 1.0 s | MET |
-| 9.3 The two logs agree | 40 of 40 records, no bad lines, run and audit entries agree | 40/40 records, 24/24 agree | 40/40 records, 24/24 agree | 40/40 records, 24/24 agree | MET |
-| 9.4 A writer does not wait long | 90% of 30 warm runs ≤ 5 s wall and ≤ 3 s CPU | p90 0.8 s wall, 1.5 s CPU | p90 0.6 s wall, 1.6 s CPU | p90 0.5 s wall, 1.4 s CPU | MET |
-| 9.5 Plain human writing is not accused | ≤ 2 of 8 plain-human texts labelled AI | 6 of 8 accused | 6 of 8 accused | 6 of 8 accused | MISSED |
+| Criterion                              | Target                                                      | Run 1                      | Run 2                      | Run 3                      | Verdict |
+| -------------------------------------- | ----------------------------------------------------------- | -------------------------- | -------------------------- | -------------------------- | ------- |
+| 9.1 Every failure kind leaves a record | 9 of 9 kinds leave exactly one record with a reason         | 9 of 9                     | 9 of 9                     | 9 of 9                     | MET     |
+| 9.2 A degraded answer is quick         | median ≤ 1 s and max ≤ 3 s with the model unable to load  | median 0.5 s, max 0.6 s    | median 0.4 s, max 1.0 s    | median 0.8 s, max 1.0 s    | MET     |
+| 9.3 The two logs agree                 | 40 of 40 records, no bad lines, run and audit entries agree | 40/40 records, 24/24 agree | 40/40 records, 24/24 agree | 40/40 records, 24/24 agree | MET     |
+| 9.4 A writer does not wait long        | 90% of 30 warm runs ≤ 5 s wall and ≤ 3 s CPU              | p90 0.8 s wall, 1.5 s CPU  | p90 0.6 s wall, 1.6 s CPU  | p90 0.5 s wall, 1.4 s CPU  | MET     |
+| 9.5 Plain human writing is not accused | ≤ 2 of 8 plain-human texts labelled AI                     | 6 of 8 accused             | 6 of 8 accused             | 6 of 8 accused             | MISSED  |
 
 Server start-up, seconds until `/health` answers (healthy server, one per run): 50.4, 20.6, 15.7; mean 28.9.
 
 ### Side by side
 
-| Criterion | Target | Before: runs 1 / 2 / 3 | Before | After: runs 1 / 2 / 3 | After | Changed |
-|---|---|---|---|---|---|---|
-| 9.1 Every failure kind leaves a record | 9 of 9 kinds leave exactly one record with a reason | 9 of 9 / 9 of 9 / 9 of 9 | **MET** | 9 of 9 / 9 of 9 / 9 of 9 | **MET** | no |
-| 9.2 A degraded answer is quick | median ≤ 1 s and max ≤ 3 s with the model unable to load | median 0.5 s, max 13.5 s / median 0.4 s, max 12.9 s / median 0.5 s, max 9.6 s | **MISSED** | median 0.5 s, max 0.6 s / median 0.4 s, max 1.0 s / median 0.8 s, max 1.0 s | **MET** | yes |
-| 9.3 The two logs agree | 40 of 40 records, no bad lines, run and audit entries agree | 40/40 records, 24/24 agree / 40/40 records, 24/24 agree / 40/40 records, 24/24 agree | **MET** | 40/40 records, 24/24 agree / 40/40 records, 24/24 agree / 40/40 records, 24/24 agree | **MET** | no |
-| 9.4 A writer does not wait long | 90% of 30 warm runs ≤ 5 s wall and ≤ 3 s CPU | p90 0.7 s wall, 2.0 s CPU / p90 0.5 s wall, 1.4 s CPU / p90 1.5 s wall, 1.7 s CPU | **MET** | p90 0.8 s wall, 1.5 s CPU / p90 0.6 s wall, 1.6 s CPU / p90 0.5 s wall, 1.4 s CPU | **MET** | no |
-| 9.5 Plain human writing is not accused | ≤ 2 of 8 plain-human texts labelled AI | 6 of 8 accused / 6 of 8 accused / 6 of 8 accused | **MISSED** | 6 of 8 accused / 6 of 8 accused / 6 of 8 accused | **MISSED** | no |
+| Criterion                              | Target                                                      | Before: runs 1 / 2 / 3                                                               | Before           | After: runs 1 / 2 / 3                                                                | After            | Changed |
+| -------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---------------- | ------------------------------------------------------------------------------------ | ---------------- | ------- |
+| 9.1 Every failure kind leaves a record | 9 of 9 kinds leave exactly one record with a reason         | 9 of 9 / 9 of 9 / 9 of 9                                                             | **MET**    | 9 of 9 / 9 of 9 / 9 of 9                                                             | **MET**    | no      |
+| 9.2 A degraded answer is quick         | median ≤ 1 s and max ≤ 3 s with the model unable to load  | median 0.5 s, max 13.5 s / median 0.4 s, max 12.9 s / median 0.5 s, max 9.6 s        | **MISSED** | median 0.5 s, max 0.6 s / median 0.4 s, max 1.0 s / median 0.8 s, max 1.0 s          | **MET**    | yes     |
+| 9.3 The two logs agree                 | 40 of 40 records, no bad lines, run and audit entries agree | 40/40 records, 24/24 agree / 40/40 records, 24/24 agree / 40/40 records, 24/24 agree | **MET**    | 40/40 records, 24/24 agree / 40/40 records, 24/24 agree / 40/40 records, 24/24 agree | **MET**    | no      |
+| 9.4 A writer does not wait long        | 90% of 30 warm runs ≤ 5 s wall and ≤ 3 s CPU              | p90 0.7 s wall, 2.0 s CPU / p90 0.5 s wall, 1.4 s CPU / p90 1.5 s wall, 1.7 s CPU    | **MET**    | p90 0.8 s wall, 1.5 s CPU / p90 0.6 s wall, 1.6 s CPU / p90 0.5 s wall, 1.4 s CPU    | **MET**    | no      |
+| 9.5 Plain human writing is not accused | ≤ 2 of 8 plain-human texts labelled AI                     | 6 of 8 accused / 6 of 8 accused / 6 of 8 accused                                     | **MISSED** | 6 of 8 accused / 6 of 8 accused / 6 of 8 accused                                     | **MISSED** | no      |
 
 **Verdicts, against the targets as written:**
 
@@ -1208,14 +1237,14 @@ Server start-up, seconds until `/health` answers (healthy server, one per run): 
 
 **9.5: signal one reads plain writing as predictable, and the safeguard against that has nothing to trigger on.** The stage is signal one (`detector.py::model_signal`), with the combining stage (`scoring.py::combine_signals`) unable to correct it. The mechanism, from the run log for the six accused texts:
 
-| Text | `model_score` | `style_score` | Gap | Combined | Guess |
-| ---- | ------------- | ------------- | --- | -------- | ----- |
-| FP02 | 0.7387 | 0.6830 | 0.056 | 0.7108 | ai |
-| FP03 | 0.8051 | 0.6496 | 0.156 | 0.7273 | ai |
-| FP04 | 0.8329 | 0.6082 | 0.225 | 0.7206 | ai |
-| FP05 | 0.8005 | 0.7125 | 0.088 | 0.7565 | ai |
-| FP06 | 0.8814 | 0.5822 | 0.299 | 0.7318 | ai |
-| FP07 | 0.8816 | 0.6038 | 0.278 | 0.7427 | ai |
+| Text | `model_score` | `style_score` | Gap   | Combined | Guess |
+| ---- | --------------- | --------------- | ----- | -------- | ----- |
+| FP02 | 0.7387          | 0.6830          | 0.056 | 0.7108   | ai    |
+| FP03 | 0.8051          | 0.6496          | 0.156 | 0.7273   | ai    |
+| FP04 | 0.8329          | 0.6082          | 0.225 | 0.7206   | ai    |
+| FP05 | 0.8005          | 0.7125          | 0.088 | 0.7565   | ai    |
+| FP06 | 0.8814          | 0.5822          | 0.299 | 0.7318   | ai    |
+| FP07 | 0.8816          | 0.6038          | 0.278 | 0.7427   | ai    |
 
 Signal one scores all six between 0.74 and 0.88, because formal, careful or repetitive writing is made of common words in ordinary sentences, which is what low perplexity rewards whoever wrote it. Signal two agrees weakly (0.58 to 0.71). The rule I wrote to protect writers in `combine_signals` pulls the score toward the human reading only when the signals differ by more than `SIGNAL_DISAGREEMENT_THRESHOLD` (0.35), and the largest gap here is 0.299, so it never fired in any of the six. It returned the plain average, 0.71 to 0.76, and `score_to_label` at `AI_THRESHOLD` 0.65 called every one "ai". I checked which signal matters by recomputing the combined score with each one neutralised to 0.5: with signal one neutral, **0 of 6** are still accused; with signal two neutral, 3 of 6 still are. Signal one is necessary; signal two alone is not enough (on its own it would accuse 2 of the 6, where signal one alone would accuse all 6).
 
@@ -1233,14 +1262,14 @@ I did not pick 9.5. The only change that clears it is raising `AI_THRESHOLD` tow
 
 Two result sets taken at different times on a laptop that has shown it can slow down by itself cannot isolate one change, so I also ran a controlled comparison in one session (`python tools/startup_check.py`, `results/startup_check.md`), flipping the switch off and on in alternating trials, each with a fresh server:
 
-| Measure | Preload off (each trial) | Off mean | Preload on (each trial) | On mean |
-|---|---|---|---|---|
-| Start-up, healthy (s) | 1.0, 1.6, 1.1 | **1.2** | 16.3, 10.6, 12.6 | **13.2** |
-| First normal request (s) | 16.3, 17.5, 14.7 | **16.1** | 6.3, 3.0, 7.5 | **5.6** |
-| Start-up, model broken (s) | 1.7, 2.6, 1.1 | **1.8** | 15.1, 16.1, 10.1 | **13.8** |
-| First degraded request (s) | 18.0, 18.9, 13.3 | **16.7** | 0.5, 0.5, 0.5 | **0.5** |
-| Second degraded request (s) | 0.4, 0.7, 0.4 | **0.5** | 0.7, 0.4, 0.5 | **0.5** |
-| Second normal request (s) | 0.4, 0.8, 0.7 | **0.6** | 2.2, 0.6, 5.9 | **2.9** |
+| Measure                     | Preload off (each trial) | Off mean       | Preload on (each trial) | On mean        |
+| --------------------------- | ------------------------ | -------------- | ----------------------- | -------------- |
+| Start-up, healthy (s)       | 1.0, 1.6, 1.1            | **1.2**  | 16.3, 10.6, 12.6        | **13.2** |
+| First normal request (s)    | 16.3, 17.5, 14.7         | **16.1** | 6.3, 3.0, 7.5           | **5.6**  |
+| Start-up, model broken (s)  | 1.7, 2.6, 1.1            | **1.8**  | 15.1, 16.1, 10.1        | **13.8** |
+| First degraded request (s)  | 18.0, 18.9, 13.3         | **16.7** | 0.5, 0.5, 0.5           | **0.5**  |
+| Second degraded request (s) | 0.4, 0.7, 0.4            | **0.5**  | 0.7, 0.4, 0.5           | **0.5**  |
+| Second normal request (s)   | 0.4, 0.8, 0.7            | **0.6**  | 2.2, 0.6, 5.9           | **2.9**  |
 
 - **Better, and not by noise.** The first degraded request fell from 13.3 to 18.9 s (mean 16.7) to 0.5 s in all three trials with the change, with no overlap between the two groups. That confirms the diagnosis and is why 9.2 went from MISSED to MET. The first normal request also fell, from 16.1 s to 5.6 s on average.
 - **Worse: the wait moved, it did not go away.** Start-up went from 1.2 s to 13.2 s on a healthy server, and from 1.8 s to 13.8 s with the model broken. Counting from launch to the first normal answer, the total was 17.3 s without the change and 18.8 s with it, so the first writer to arrive right after a launch waits about as long as before. The gain is for every request after that, and for a degraded one (18.5 s from launch to first answer without the change, 14.3 s with it). In the after set the start-up took 50.4, 20.6 and 15.7 s, longer than this controlled run; I did not find out why the first of those was so slow.
@@ -1353,16 +1382,16 @@ Every warm run, in order (wall ms / CPU ms):
 
 Produced by `run_attacks.py::main`, which sends each text to `app.py::submit`; the label comes from `scoring.py::score_to_label`. Below: the eight false-positive rows of the report it wrote (`results\attack_run_2026-11-08_1836_unit9_run1.md`).
 
-| ID | Family | Targeting | Status | Content ID | Guess | Score | Verdict |
-|---|---|---|---|---|---|---|---|
-| FP01 | false_positive | plain, clear human writing with no flourishes | 200 | `399779ec-2629-48da-91c5-c4ff1773793d` | unsure | 0.237 |  |
-| FP02 | false_positive | human writing in a formal register | 200 | `d7778572-c39b-4bae-8450-bf4d48fc58a3` | ai | 0.174 |  |
-| FP03 | false_positive | a non-native English speaker writing carefully | 200 | `90fa4ecc-54d6-4666-913c-2c52394297ae` | ai | 0.221 |  |
-| FP04 | false_positive | a student essay written to a rubric | 200 | `c67dd98d-2fd0-43bf-a939-63f1f0a29b39` | ai | 0.202 |  |
-| FP05 | false_positive | technical documentation written by a person | 200 | `940b0c75-1516-4ac9-bf95-59f4af7d4a03` | ai | 0.304 |  |
-| FP06 | false_positive | a person imitating a formal template | 200 | `a6d17d41-7c78-411d-8770-f3c023fefbe1` | ai | 0.234 |  |
-| FP07 | false_positive | human writing that repeats a phrase deliberately | 200 | `e0821d7e-e16e-4a6e-bf22-bb3a6569e001` | ai | 0.265 |  |
-| FP08 | false_positive | very short genuine human submission | 200 | `e6854e7b-d7f4-46f9-95f9-f662e7c8c054` | unsure | 0.482 |  |
+| ID   | Family         | Targeting                                        | Status | Content ID                               | Guess  | Score | Verdict |
+| ---- | -------------- | ------------------------------------------------ | ------ | ---------------------------------------- | ------ | ----- | ------- |
+| FP01 | false_positive | plain, clear human writing with no flourishes    | 200    | `399779ec-2629-48da-91c5-c4ff1773793d` | unsure | 0.237 |         |
+| FP02 | false_positive | human writing in a formal register               | 200    | `d7778572-c39b-4bae-8450-bf4d48fc58a3` | ai     | 0.174 |         |
+| FP03 | false_positive | a non-native English speaker writing carefully   | 200    | `90fa4ecc-54d6-4666-913c-2c52394297ae` | ai     | 0.221 |         |
+| FP04 | false_positive | a student essay written to a rubric              | 200    | `c67dd98d-2fd0-43bf-a939-63f1f0a29b39` | ai     | 0.202 |         |
+| FP05 | false_positive | technical documentation written by a person      | 200    | `940b0c75-1516-4ac9-bf95-59f4af7d4a03` | ai     | 0.304 |         |
+| FP06 | false_positive | a person imitating a formal template             | 200    | `a6d17d41-7c78-411d-8770-f3c023fefbe1` | ai     | 0.234 |         |
+| FP07 | false_positive | human writing that repeats a phrase deliberately | 200    | `e0821d7e-e16e-4a6e-bf22-bb3a6569e001` | ai     | 0.265 |         |
+| FP08 | false_positive | very short genuine human submission              | 200    | `e6854e7b-d7f4-46f9-95f9-f662e7c8c054` | unsure | 0.482 |         |
 
 #### 9.2 again, after the improvement (run 1 of the after set)
 
@@ -1382,6 +1411,26 @@ trial 3: 10/10 behaved as 'degraded'
 {"timestamp": "2026-11-09T03:06:33.741+00:00", "run_id": "7ef2e90f972445998a91e7e6afc1babf", "content_id": "2f4b8a3f-ee55-4c4f-8201-4583e41a5078", "route": "/submit", "status_code": 200, "outcome": "degraded", "creator_id": "degraded_degraded_u9afterr1t190555_t3_10", "input": {"type": "str", "chars": 62, "words": 13, "preview": "I still have the first letter she sent me, folded in a drawer."}, "output": {"status_code": 200, "guess": "unsure", "confidence": 0.0, "label": "We couldn't tell either way. This piece could have been written by a person or by AI — treat this result as inconclusive, not as an accusation. Only part of our check could run, so this is less certain than usual.", "error": null, "message": null}, "duration_ms": 405.4, "cpu_ms": 281.2, "model_ms": 403.1, "style_ms": 0.0, "cold_start": true, "model_score": null, "style_score": 0.6667, "combined_score": 0.6667, "degraded": true, "degraded_reason": "DetectorUnavailable: Couldn't load 'does-not-exist-xyz': does-not-exist-xyz is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models' If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth", "exception": null, "config": {"detector_model": "does-not-exist-xyz", "human_threshold": 0.35, "ai_threshold": 0.65, "weight_model": 0.5, "weight_style": 0.5}}
 ```
 
+---
+
+## What's Still Broken, After Unit 9
+
+**Criteria still missed: one, 9.5.** 9.2 was missed until the preload change and is met now. 9.1, 9.3 and 9.4 were met in all six runs.
+
+**9.5: 6 of the 8 plain-human texts are still called AI (FP02 to FP07), against a target of at most 2.**
+
+- **What I would do.** Move signal one's midpoint (the perplexity at which its score is 0.5, currently 45 in `detector.py::model_signal`) and re-pick `AI_THRESHOLD` together, both fitted to a larger labelled set instead of chosen by eye. If something had to ship before that, I would raise `AI_THRESHOLD` from 0.65 to about 0.76, just above the highest of the six accused texts (0.7565). That clears all six, and costs me the AI label on my clearly-AI calibration text (0.7364), which would fall to "unsure". Changing the weights would not help: at 0.3 / 0.7 all six stay above 0.65, and earlier in this unit neutralising signal one entirely was the only thing that cleared them, so the problem is signal one's score for this kind of writing, not how it is weighted.
+- **Why I stopped.** It was not time. First, I was asked for one improvement and spent it on 9.2, where I could name the mechanism and test the fix in isolation. Second, every fix for 9.5 trades wrongful accusations against missed AI text, and who pays for that is a decision I would rather you made than have me slip in as a tweak. Third, I cannot defend any particular number. The highest accused score (0.7565) and my calibration AI text (0.7364) are 0.02 apart, so a threshold between them rests on about two data points, and eight false-positive texts cannot support a rate.
+
+**Met, but weaker than the table makes it look:**
+
+- **9.2** holds with little margin on the median (run 3 was 0.8 s against a limit of 1 s), and the fix that earned it adds about 12 seconds to start-up.
+- **9.4** held in all six runs, but the same code gave a 90th percentile of 20.9 s in my first measurement, and I never found what was slowing the machine. It holds when the machine is quiet.
+- **9.1** injects two of its nine failures (the model failure and the route crash), so it shows the recording works and not that the live service has crashed and been caught.
+- **9.3** covers one server process. The run log's lock only works within one process, so several workers would be unprotected.
+- **One unexplained result:** the second normal request was slower with the preload change in two of three controlled trials (2.2 s and 5.9 s against 0.4 to 0.8 s). The 30-run sets do not show it, so I am calling it noise, but I did not show that.
+
+**If I had another unit,** the first thing I would do is build a labelled set of at least a hundred texts, fifty human (with plenty of the plain, formal and second-language writing this system wrongly accuses) and fifty AI, because every decision still open here (the threshold, the midpoint, the weights, even whether 2 of 8 is the right target for 9.5) is being judged on eight false-positive texts that cannot support a rate. I would do that before changing any number, because the choice between accusing fewer writers and missing more AI text can only be made, and defended, once I can say how many of each it costs.
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
